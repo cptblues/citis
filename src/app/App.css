@@ -1,0 +1,138 @@
+.app-shell {
+  width: min(1200px, 100%);
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 48px);
+}
+
+.app-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #527458;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  color: #18351f;
+  font-size: clamp(2.6rem, 7vw, 5rem);
+  line-height: 0.9;
+  letter-spacing: -0.06em;
+}
+
+h2 {
+  margin-bottom: 6px;
+  color: #18351f;
+  font-size: 1.25rem;
+}
+
+.step-label {
+  margin-bottom: 4px;
+  color: #637066;
+  font-weight: 600;
+}
+
+.game-card {
+  overflow: hidden;
+  border: 1px solid #d3dbd1;
+  border-radius: 22px;
+  background: #fffdf7;
+  box-shadow: 0 24px 70px rgb(41 55 42 / 10%);
+}
+
+.game-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #d3dbd1;
+}
+
+.game-card__header p {
+  margin-bottom: 0;
+  color: #637066;
+}
+
+.status-badge {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: #31583a;
+  background: #e0eedf;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.game-viewport {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background: #dfe8dd;
+}
+
+.game-viewport canvas {
+  display: block;
+}
+
+@media (max-width: 680px) {
+  .app-header,
+  .game-card__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .step-label {
+    margin-bottom: 0;
+  }
+}
+
+.build-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 24px;
+  border-bottom: 1px solid #d3dbd1;
+  background: #f7f4e9;
+}
+
+.build-button {
+  padding: 10px 16px;
+  border: 2px solid #8d5d46;
+  border-radius: 12px;
+  color: #623e2f;
+  background: #fffaf0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.build-button:hover {
+  background: #f5e6c8;
+}
+
+.build-button--active {
+  color: #fffdf7;
+  background: #8d5d46;
+}
+
+.build-toolbar__status {
+  color: #637066;
+  font-size: 0.9rem;
+}
