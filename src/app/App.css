@@ -197,3 +197,10 @@ h2 {
   cursor: not-allowed;
   opacity: 0.4;
 }
+
+.proposal-resources {
+  color: #527458;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}

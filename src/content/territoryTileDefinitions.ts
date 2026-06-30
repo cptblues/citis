@@ -3,11 +3,14 @@ import type {
   TerritoryTileTypeId,
 } from "../engine/board";
 
+import type { TerritoryResources } from "../engine/resources";
+
 export interface TerritoryTileDefinition {
   label: string;
   fillColor: number;
   hoverColor: number;
   strokeColor: number;
+  baseResources: TerritoryResources;
 }
 
 export const PROTOTYPE_PLACEABLE_TILE_TYPE_IDS = [
@@ -18,7 +21,7 @@ export const PROTOTYPE_PLACEABLE_TILE_TYPE_IDS = [
 export type PrototypePlaceableTileTypeId =
   (typeof PROTOTYPE_PLACEABLE_TILE_TYPE_IDS)[number];
 
-const TERRITORY_TILE_DEFINITIONS: Partial<
+export const TERRITORY_TILE_DEFINITIONS: Partial<
   Record<TerritoryTileTypeId, TerritoryTileDefinition>
 > = {
   town: {
@@ -26,6 +29,12 @@ const TERRITORY_TILE_DEFINITIONS: Partial<
     fillColor: 0xf2d492,
     hoverColor: 0xf7dfaa,
     strokeColor: 0x18351f,
+    baseResources: {
+      food: 0,
+      energy: 0,
+      nature: 0,
+      happiness: 0,
+    },
   },
 
   prairie: {
@@ -33,6 +42,12 @@ const TERRITORY_TILE_DEFINITIONS: Partial<
     fillColor: 0xa9cf7c,
     hoverColor: 0xc1df9d,
     strokeColor: 0x4b793d,
+    baseResources: {
+      food: 0,
+      energy: 0,
+      nature: 2,
+      happiness: 2,
+    },
   },
 
   forest: {
@@ -40,6 +55,12 @@ const TERRITORY_TILE_DEFINITIONS: Partial<
     fillColor: 0x659765,
     hoverColor: 0x7ead7e,
     strokeColor: 0x28563a,
+    baseResources: {
+      food: 0,
+      energy: 0,
+      nature: 4,
+      happiness: 1,
+    },
   },
 };
 

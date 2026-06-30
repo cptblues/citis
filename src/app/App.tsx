@@ -31,7 +31,7 @@ export function App() {
           <h1>Citis</h1>
         </div>
 
-        <p className="step-label">Migration 3 · Boucle de tour</p>
+        <p className="step-label">Migration 5 · Synergies</p>
       </header>
 
       <section className="game-card" aria-labelledby="game-title">
@@ -59,6 +59,19 @@ export function App() {
             {proposals.map((tileTypeId, proposalIndex) => {
               const definition = getTerritoryTileDefinition(tileTypeId);
 
+              const resources = definition.baseResources;
+
+              const resourceSummary = [
+                resources.food > 0 ? `Nourriture +${resources.food}` : "",
+                resources.energy > 0 ? `Énergie +${resources.energy}` : "",
+                resources.nature > 0 ? `Nature +${resources.nature}` : "",
+                resources.happiness > 0
+                  ? `Bonheur +${resources.happiness}`
+                  : "",
+              ]
+                .filter((value) => value !== "")
+                .join(" · ");
+
               const isSelected = selectedTileTypeId === tileTypeId;
 
               return (
@@ -79,6 +92,9 @@ export function App() {
                   <small>Proposition {proposalIndex + 1}</small>
 
                   <span>{definition.label}</span>
+                  <small className="proposal-resources">
+                    {resourceSummary}
+                  </small>
                 </button>
               );
             })}

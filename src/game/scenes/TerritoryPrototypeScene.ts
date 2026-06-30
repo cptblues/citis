@@ -11,13 +11,33 @@ import {
   type PlacedTerritoryTile,
 } from "../../engine/board";
 import { axialToPixel, getHexCorners, type HexPoint } from "../../engine/hex";
-import { getTerritoryTileDefinition } from "../../content/territoryTileDefinitions";
+import {
+  getTerritoryTileDefinition,
+  TERRITORY_TILE_DEFINITIONS,
+} from "../../content/territoryTileDefinitions";
 import {
   SET_SELECTED_TILE_TYPE_EVENT,
   type SelectedTileTypeId,
   SET_PLACEMENT_ENABLED_EVENT,
   TERRITORY_TILE_PLACED_EVENT,
 } from "../gameEvents";
+
+import { calculateTerritoryResources } from "../../engine/resources";
+
+import { TERRITORY_SYNERGY_DEFINITIONS } from "../../content/territorySynergyDefinitions";
+
+import { previewTerritoryTilePlacement } from "../../engine/placementPreview";
+
+import {
+  createTerritoryTileContent,
+  createTownContent,
+} from "../rendering/territoryTileContent";
+
+import {
+  formatPlacementPreview,
+  showResourceDeltaFeedback,
+  showSynergyFeedback,
+} from "../rendering/territoryFeedback";
 
 const MAP_CENTER_X = 480;
 const MAP_CENTER_Y = 350;
@@ -29,6 +49,9 @@ const EMPTY_STROKE_COLOR = 0x9ba79c;
 const AVAILABLE_FILL_COLOR = 0xdcebd2;
 const AVAILABLE_HOVER_COLOR = 0xc5e2b7;
 const AVAILABLE_STROKE_COLOR = 0x4f8058;
+
+const SYNERGY_PREVIEW_STROKE_COLOR = 0x765da8;
+const SYNERGY_PREVIEW_STROKE_WIDTH = 6;
 
 // const TOWN_FILL_COLOR = 0xf2d492;
 // const TOWN_STROKE_COLOR = 0x18351f;
@@ -64,6 +87,12 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
 
   private placementEnabled = true;
 
+  private resourcesText!: Phaser.GameObjects.Text;
+
+  private placementPreviewText!: Phaser.GameObjects.Text;
+
+  private previewSynergyCellIds = new Set<string>();
+
   /**
    * Déclare la clé de scène utilisée par la configuration Phaser.
    */
@@ -79,7 +108,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
   public create(): void {
     this.cameras.main.setBackgroundColor("#dfe8dd");
 
-    this.add.text(32, 28, "Première boucle de tour", {
+    this.add.text(32, 28, "Premières synergies", {
       color: "#18351f",
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize: "28px",
@@ -89,7 +118,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.add.text(
       32,
       70,
-      "Choisis une proposition, pose-la, puis termine le tour.",
+      "Survole un emplacement pour prévisualiser les bonus de voisinage.",
       {
         color: "#4f5e51",
         fontFamily: "Inter, system-ui, sans-serif",
@@ -105,6 +134,27 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
         fontStyle: "bold",
       })
       .setOrigin(1, 0);
+
+    this.resourcesText = this.add
+      .text(32, 108, "", {
+        color: "#31583a",
+        fontFamily: "Inter, system-ui, sans-serif",
+        fontSize: "17px",
+        fontStyle: "bold",
+      })
+      .setDepth(100);
+
+    this.placementPreviewText = this.add
+      .text(32, 138, "Sélectionne une proposition et survole un emplacement.", {
+        color: "#645483",
+        fontFamily: "Inter, system-ui, sans-serif",
+        fontSize: "15px",
+        fontStyle: "bold",
+        lineSpacing: 5,
+      })
+      .setDepth(100);
+
+    this.refreshResources();
 
     this.game.events.on(
       SET_SELECTED_TILE_TYPE_EVENT,
@@ -185,6 +235,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
 
     graphics.on("pointerover", () => {
       this.hoveredCellId = cell.id;
+      this.refreshPlacementPreview(cell);
       this.redrawAllCells();
     });
 
@@ -192,7 +243,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       if (this.hoveredCellId === cell.id) {
         this.hoveredCellId = null;
       }
-
+      this.clearPlacementPreview();
       this.redrawAllCells();
     });
 
@@ -219,12 +270,27 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
 
       const selectedTileTypeId = this.selectedTileTypeId;
 
+      const placementPreview = previewTerritoryTilePlacement(
+        prototypeBoardCells,
+        this.boardState,
+        cell.id,
+        selectedTileTypeId,
+        TERRITORY_TILE_DEFINITIONS,
+        TERRITORY_SYNERGY_DEFINITIONS,
+      );
+
+      if (!placementPreview.valid) {
+        return;
+      }
+
       this.boardState = placeTerritoryTile(
         prototypeBoardCells,
         this.boardState,
         cell.id,
         selectedTileTypeId,
       );
+
+      const resourceDelta = placementPreview.resourceDelta;
 
       if (this.boardState.placedTiles.length === previousTileCount) {
         return;
@@ -237,6 +303,38 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       }
 
       this.drawPlacedTileContent(placedTile);
+
+      this.refreshResources();
+
+      const placementCellView = this.cellViews.get(cell.id);
+
+      if (placementCellView !== undefined) {
+        showResourceDeltaFeedback(
+          this,
+          placementCellView.centerX,
+          placementCellView.centerY,
+          resourceDelta,
+        );
+      }
+
+      if (placementCellView !== undefined) {
+        const affectedGraphics = placementPreview.affectedCellIds
+          .map((affectedCellId) => this.cellViews.get(affectedCellId)?.graphics)
+          .filter(
+            (graphics): graphics is Phaser.GameObjects.Graphics =>
+              graphics !== undefined,
+          );
+
+        showSynergyFeedback(
+          this,
+          placementCellView.centerX,
+          placementCellView.centerY,
+          placementPreview.createdSynergies.map((synergy) => synergy.label),
+          affectedGraphics,
+        );
+      }
+
+      this.clearPlacementPreview();
 
       this.placementEnabled = false;
       this.selectedTileTypeId = null;
@@ -251,7 +349,15 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
 
       const definition = getTerritoryTileDefinition(placedTile.typeId);
 
-      this.statusText.setText(`${definition.label} posée · termine le tour`);
+      const synergySummary = placementPreview.createdSynergies
+        .map((synergy) => synergy.label)
+        .join(", ");
+
+      this.statusText.setText(
+        synergySummary.length > 0
+          ? `${definition.label} posée · ${synergySummary} ! · termine le tour`
+          : `${definition.label} posée · termine le tour`,
+      );
     });
 
     this.redrawCell(cell.id);
@@ -325,6 +431,12 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       strokeWidth = isHovered ? 5 : 3;
     }
 
+    if (this.previewSynergyCellIds.has(cellId)) {
+      strokeColor = SYNERGY_PREVIEW_STROKE_COLOR;
+
+      strokeWidth = SYNERGY_PREVIEW_STROKE_WIDTH;
+    }
+
     cellView.graphics.clear();
 
     cellView.graphics.fillStyle(fillColor, fillAlpha);
@@ -350,44 +462,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       return;
     }
 
-    const container = this.add.container(
-      townCell.centerX,
-      townCell.centerY - 5,
-    );
-
-    const mainBuilding = this.add.rectangle(0, 7, 34, 26, 0xf1e1bd);
-
-    const roof = this.add.graphics();
-
-    roof.fillStyle(0xb85f45, 1);
-    roof.beginPath();
-    roof.moveTo(-21, -3);
-    roof.lineTo(0, -23);
-    roof.lineTo(21, -3);
-    roof.closePath();
-    roof.fillPath();
-
-    const door = this.add.rectangle(0, 13, 8, 14, 0x6c4835);
-
-    const leftHouse = this.add.rectangle(-24, 12, 15, 17, 0xf5e6c8);
-
-    const rightHouse = this.add.rectangle(24, 12, 15, 17, 0xf5e6c8);
-
-    container.add([mainBuilding, roof, door, leftHouse, rightHouse]);
-
-    container.setDepth(10);
-
-    this.add
-      .text(townCell.centerX, townCell.centerY - 46, "Bourg", {
-        color: "#18351f",
-        fontFamily: "Inter, system-ui, sans-serif",
-        fontSize: "14px",
-        fontStyle: "bold",
-        stroke: "#fffdf7",
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5)
-      .setDepth(20);
+    createTownContent(this, townCell.centerX, townCell.centerY);
   }
 
   /**
@@ -396,6 +471,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
   private handleSelectedTileTypeChanged(tileTypeId: SelectedTileTypeId): void {
     this.selectedTileTypeId = tileTypeId;
     this.hoveredCellId = null;
+    this.clearPlacementPreview();
 
     if (!this.placementEnabled) {
       this.selectedTileTypeId = null;
@@ -445,46 +521,16 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       return;
     }
 
-    const container = this.add.container(cellView.centerX, cellView.centerY);
+    const container = createTerritoryTileContent(
+      this,
+      tile,
+      cellView.centerX,
+      cellView.centerY,
+    );
 
-    if (tile.typeId === "prairie") {
-      const flowers = [
-        [-20, -8],
-        [-6, 10],
-        [10, -13],
-        [22, 8],
-        [2, 22],
-      ] as const;
-
-      for (const [x, y] of flowers) {
-        const flower = this.add.circle(x, y, 3, 0xf4df78);
-
-        const center = this.add.circle(x, y, 1, 0x9c6d32);
-
-        container.add([flower, center]);
-      }
+    if (container === null) {
+      return;
     }
-
-    if (tile.typeId === "forest") {
-      const treePositions = [
-        [-20, 9],
-        [0, -8],
-        [20, 10],
-        [2, 19],
-      ] as const;
-
-      for (const [x, y] of treePositions) {
-        const trunk = this.add.rectangle(x, y + 9, 5, 13, 0x715039);
-
-        const crown = this.add.circle(x, y, 12, 0x315f3c);
-
-        const highlight = this.add.circle(x - 4, y - 4, 5, 0x4f7d50);
-
-        container.add([trunk, crown, highlight]);
-      }
-    }
-
-    container.setDepth(10);
 
     this.placedTileContentViews.set(tile.id, container);
   }
@@ -494,6 +540,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
    */
   private handlePlacementEnabledChanged(placementEnabled: boolean): void {
     this.placementEnabled = placementEnabled;
+    this.clearPlacementPreview();
 
     if (placementEnabled) {
       this.statusText.setText(
@@ -506,5 +553,59 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     }
 
     this.redrawAllCells();
+  }
+
+  private refreshResources(): void {
+    const resources = calculateTerritoryResources(
+      this.boardState,
+      TERRITORY_TILE_DEFINITIONS,
+      TERRITORY_SYNERGY_DEFINITIONS,
+    );
+
+    this.resourcesText.setText(
+      [
+        `Nourriture : ${resources.food}`,
+        `Énergie : ${resources.energy}`,
+        `Nature : ${resources.nature}`,
+        `Bonheur : ${resources.happiness}`,
+      ].join("   ·   "),
+    );
+  }
+
+  private clearPlacementPreview(): void {
+    this.previewSynergyCellIds.clear();
+
+    this.placementPreviewText.setText(
+      "Sélectionne une proposition et survole un emplacement.",
+    );
+  }
+
+  private refreshPlacementPreview(cell: BoardCell): void {
+    this.clearPlacementPreview();
+
+    if (
+      !this.placementEnabled ||
+      this.selectedTileTypeId === null ||
+      !this.availableCellIds.has(cell.id)
+    ) {
+      return;
+    }
+
+    const preview = previewTerritoryTilePlacement(
+      prototypeBoardCells,
+      this.boardState,
+      cell.id,
+      this.selectedTileTypeId,
+      TERRITORY_TILE_DEFINITIONS,
+      TERRITORY_SYNERGY_DEFINITIONS,
+    );
+
+    if (!preview.valid) {
+      return;
+    }
+
+    this.previewSynergyCellIds = new Set(preview.affectedCellIds);
+
+    this.placementPreviewText.setText(formatPlacementPreview(preview));
   }
 }
