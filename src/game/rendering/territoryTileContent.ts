@@ -1,10 +1,10 @@
 import Phaser from "phaser";
 
+import type { TerritoryTileRendererKey } from "../../content/territoryContentCatalog";
 import {
   getTerritoryTileDefinition,
   type TerritoryTileDefinition,
 } from "../../content/territoryTileDefinitions";
-import type { TerritoryTileRendererKey } from "../../content/territoryContentCatalog";
 import type { PlacedTerritoryTile } from "../../engine/board";
 
 interface TerritoryTileRendererContext {
@@ -21,6 +21,9 @@ const TERRITORY_TILE_RENDERERS = {
   prairie: renderPrairie,
   forest: renderForest,
   river: renderRiver,
+  field: renderField,
+  orchard: renderOrchard,
+  farm: renderFarm,
 } satisfies Record<TerritoryTileRendererKey, TerritoryTileRenderer>;
 
 export function createTerritoryTileContent(
@@ -165,6 +168,86 @@ function drawRiverPath(graphics: Phaser.GameObjects.Graphics): void {
   graphics.lineTo(-16, -25);
   graphics.lineTo(-28, -48);
   graphics.strokePath();
+}
+
+function renderField({ scene, container }: TerritoryTileRendererContext): void {
+  const rows = scene.add.graphics();
+  rows.lineStyle(5, 0xa7833f, 1);
+
+  for (const offset of [-24, -8, 8, 24]) {
+    rows.beginPath();
+    rows.moveTo(offset - 12, 28);
+    rows.lineTo(offset + 12, -28);
+    rows.strokePath();
+  }
+
+  const cropPositions = [
+    [-25, 12],
+    [-14, -10],
+    [-4, 18],
+    [7, -13],
+    [18, 12],
+    [28, -9],
+  ] as const;
+
+  container.add(rows);
+
+  for (const [x, y] of cropPositions) {
+    const stem = scene.add.rectangle(x, y + 3, 2, 9, 0x6f7b32);
+    const grain = scene.add.ellipse(x, y - 3, 5, 9, 0xe8d78b);
+    container.add([stem, grain]);
+  }
+}
+
+function renderOrchard({
+  scene,
+  container,
+}: TerritoryTileRendererContext): void {
+  const treePositions = [
+    [-22, -10],
+    [0, -16],
+    [22, -8],
+    [-12, 18],
+    [15, 17],
+  ] as const;
+
+  for (const [x, y] of treePositions) {
+    const trunk = scene.add.rectangle(x, y + 8, 4, 12, 0x75503a);
+    const crown = scene.add.circle(x, y, 10, 0x587b3c);
+    const highlight = scene.add.circle(x - 3, y - 3, 4, 0x789c50);
+    const fruit = scene.add.circle(x + 4, y + 1, 2, 0xd8704f);
+    container.add([trunk, crown, highlight, fruit]);
+  }
+}
+
+function renderFarm({ scene, container }: TerritoryTileRendererContext): void {
+  container.y -= 2;
+
+  const barn = scene.add.rectangle(0, 9, 34, 29, 0xc8674e);
+  const barnRoof = scene.add.graphics();
+  barnRoof.fillStyle(0x7d4536, 1);
+  barnRoof.beginPath();
+  barnRoof.moveTo(-21, -4);
+  barnRoof.lineTo(0, -23);
+  barnRoof.lineTo(21, -4);
+  barnRoof.closePath();
+  barnRoof.fillPath();
+
+  const barnDoor = scene.add.rectangle(0, 13, 13, 20, 0x7a4d37);
+  const doorCross = scene.add.graphics();
+  doorCross.lineStyle(2, 0xd9ad7b, 1);
+  doorCross.beginPath();
+  doorCross.moveTo(-6, 4);
+  doorCross.lineTo(6, 22);
+  doorCross.moveTo(6, 4);
+  doorCross.lineTo(-6, 22);
+  doorCross.strokePath();
+
+  const silo = scene.add.ellipse(27, 9, 14, 31, 0xd9d0b5);
+  const siloRoof = scene.add.ellipse(27, -7, 14, 7, 0x8d8a7d);
+  const hay = scene.add.ellipse(-27, 20, 16, 9, 0xe0bd62);
+
+  container.add([barn, barnRoof, barnDoor, doorCross, silo, siloRoof, hay]);
 }
 
 export function createTerritoryTilePreviewContent(

@@ -189,6 +189,84 @@ export const TERRITORY_CONTENT = {
         order: 3,
       },
     },
+
+    field: {
+      label: "Champ",
+      fillColor: 0xd9c46f,
+      hoverColor: 0xe8d98d,
+      strokeColor: 0x7b6731,
+      baseResources: {
+        food: 4,
+        energy: 0,
+        nature: -1,
+        happiness: 0,
+      },
+      tags: ["agricultural", "field"],
+      renderer: "field",
+      placement: {
+        placeable: true,
+        rotationEnabled: false,
+        previewContentEnabled: false,
+        invalidMessage: null,
+        connection: null,
+      },
+      proposals: {
+        enabled: true,
+        order: 4,
+      },
+    },
+
+    orchard: {
+      label: "Verger",
+      fillColor: 0xa8bd6a,
+      hoverColor: 0xc0d482,
+      strokeColor: 0x536b31,
+      baseResources: {
+        food: 3,
+        energy: 0,
+        nature: 2,
+        happiness: 1,
+      },
+      tags: ["agricultural", "natural", "orchard"],
+      renderer: "orchard",
+      placement: {
+        placeable: true,
+        rotationEnabled: false,
+        previewContentEnabled: false,
+        invalidMessage: null,
+        connection: null,
+      },
+      proposals: {
+        enabled: true,
+        order: 5,
+      },
+    },
+
+    farm: {
+      label: "Ferme",
+      fillColor: 0xd8ad73,
+      hoverColor: 0xe7c28f,
+      strokeColor: 0x76513a,
+      baseResources: {
+        food: 2,
+        energy: 1,
+        nature: 0,
+        happiness: 1,
+      },
+      tags: ["agricultural", "building", "farm"],
+      renderer: "farm",
+      placement: {
+        placeable: true,
+        rotationEnabled: false,
+        previewContentEnabled: false,
+        invalidMessage: null,
+        connection: null,
+      },
+      proposals: {
+        enabled: true,
+        order: 6,
+      },
+    },
   },
 
   upgrades: {
@@ -213,6 +291,70 @@ export const TERRITORY_CONTENT = {
         appliedMessage: "Le sentier améliore désormais cette Forêt.",
       },
     },
+
+    hedges: {
+      label: "Haies bocagères",
+      description: "Protège les sols et recrée des habitats autour du champ.",
+      target: {
+        requiredTags: ["field"],
+        label: "Champ",
+      },
+      resourceBonus: {
+        food: 0,
+        energy: 0,
+        nature: 2,
+        happiness: 1,
+      },
+      renderer: "hedges",
+      ui: {
+        selectionMessage: "Sélectionne un Champ à entourer de haies",
+        unavailableMessage: "Haies bocagères : nécessite un Champ disponible",
+        appliedMessage: "Les haies protègent désormais ce Champ.",
+      },
+    },
+
+    beehives: {
+      label: "Ruches",
+      description: "Renforce la pollinisation et la production du verger.",
+      target: {
+        requiredTags: ["orchard"],
+        label: "Verger",
+      },
+      resourceBonus: {
+        food: 2,
+        energy: 0,
+        nature: 1,
+        happiness: 0,
+      },
+      renderer: "beehives",
+      ui: {
+        selectionMessage: "Sélectionne un Verger où installer les ruches",
+        unavailableMessage: "Ruches : nécessite un Verger disponible",
+        appliedMessage: "Les ruches sont installées dans ce Verger.",
+      },
+    },
+
+    "solar-panels": {
+      label: "Panneaux solaires",
+      description: "Produit de l’énergie locale sur les bâtiments agricoles.",
+      target: {
+        requiredTags: ["farm"],
+        label: "Ferme",
+      },
+      resourceBonus: {
+        food: 0,
+        energy: 3,
+        nature: 0,
+        happiness: 0,
+      },
+      renderer: "solar-panels",
+      ui: {
+        selectionMessage: "Sélectionne une Ferme à équiper",
+        unavailableMessage:
+          "Panneaux solaires : nécessite une Ferme disponible",
+        appliedMessage: "La Ferme produit désormais de l’énergie solaire.",
+      },
+    },
   },
 
   synergies: [
@@ -229,6 +371,66 @@ export const TERRITORY_CONTENT = {
         energy: 0,
         nature: 2,
         happiness: 0,
+      },
+    },
+    {
+      id: "protected-water",
+      label: "Eau protégée",
+      condition: {
+        kind: "adjacent-tags",
+        firstTag: "forest",
+        secondTag: "water",
+      },
+      resourceBonus: {
+        food: 0,
+        energy: 0,
+        nature: 2,
+        happiness: 0,
+      },
+    },
+    {
+      id: "field-irrigation",
+      label: "Irrigation",
+      condition: {
+        kind: "adjacent-tags",
+        firstTag: "field",
+        secondTag: "water",
+      },
+      resourceBonus: {
+        food: 2,
+        energy: 0,
+        nature: 0,
+        happiness: 0,
+      },
+    },
+    {
+      id: "orchard-pollination",
+      label: "Pollinisation",
+      condition: {
+        kind: "adjacent-tags",
+        firstTag: "orchard",
+        secondTag: "grassland",
+      },
+      resourceBonus: {
+        food: 2,
+        energy: 0,
+        nature: 1,
+        happiness: 0,
+      },
+    },
+    {
+      id: "farm-short-circuit",
+      label: "Circuit court",
+      condition: {
+        kind: "adjacent-tags",
+        firstTag: "farm",
+        secondTag: "settlement",
+      },
+      resourceBonus: {
+        food: 0,
+        energy: 0,
+        nature: 0,
+        happiness: 2,
       },
     },
   ],

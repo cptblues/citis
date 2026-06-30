@@ -19,6 +19,9 @@ describe("territory content catalog", () => {
       "prairie",
       "forest",
       "river",
+      "field",
+      "orchard",
+      "farm",
     ]);
   });
 
@@ -28,12 +31,22 @@ describe("territory content catalog", () => {
       baseSides: [0, 2],
     });
     expect(TERRITORY_CONNECTION_DEFINITIONS.forest).toBeUndefined();
+    expect(TERRITORY_CONNECTION_DEFINITIONS.field).toBeUndefined();
   });
 
   it("résout les cibles d'amélioration par tags", () => {
     expect(
       TERRITORY_UPGRADE_DEFINITIONS["forest-trail"].allowedTileTypeIds,
     ).toEqual(["forest"]);
+    expect(TERRITORY_UPGRADE_DEFINITIONS.hedges.allowedTileTypeIds).toEqual([
+      "field",
+    ]);
+    expect(TERRITORY_UPGRADE_DEFINITIONS.beehives.allowedTileTypeIds).toEqual([
+      "orchard",
+    ]);
+    expect(
+      TERRITORY_UPGRADE_DEFINITIONS["solar-panels"].allowedTileTypeIds,
+    ).toEqual(["farm"]);
   });
 
   it("déplie les synergies par tags en règles moteur", () => {
@@ -48,6 +61,66 @@ describe("territory content catalog", () => {
         nature: 2,
         happiness: 0,
       },
+    });
+
+    expect(TERRITORY_SYNERGY_DEFINITIONS).toContainEqual({
+      id: "protected-water",
+      label: "Eau protégée",
+      firstTileTypeId: "forest",
+      secondTileTypeId: "river",
+      resourceBonus: {
+        food: 0,
+        energy: 0,
+        nature: 2,
+        happiness: 0,
+      },
+    });
+
+    expect(TERRITORY_SYNERGY_DEFINITIONS).toContainEqual({
+      id: "orchard-pollination",
+      label: "Pollinisation",
+      firstTileTypeId: "orchard",
+      secondTileTypeId: "prairie",
+      resourceBonus: {
+        food: 2,
+        energy: 0,
+        nature: 1,
+        happiness: 0,
+      },
+    });
+
+    expect(TERRITORY_SYNERGY_DEFINITIONS).toContainEqual({
+      id: "farm-short-circuit",
+      label: "Circuit court",
+      firstTileTypeId: "farm",
+      secondTileTypeId: "town",
+      resourceBonus: {
+        food: 0,
+        energy: 0,
+        nature: 0,
+        happiness: 2,
+      },
+    });
+  });
+
+  it("décrit les ressources du pack agricole", () => {
+    expect(TERRITORY_CONTENT.tiles.field.baseResources).toEqual({
+      food: 4,
+      energy: 0,
+      nature: -1,
+      happiness: 0,
+    });
+    expect(TERRITORY_CONTENT.tiles.orchard.baseResources).toEqual({
+      food: 3,
+      energy: 0,
+      nature: 2,
+      happiness: 1,
+    });
+    expect(TERRITORY_CONTENT.tiles.farm.baseResources).toEqual({
+      food: 2,
+      energy: 1,
+      nature: 0,
+      happiness: 1,
     });
   });
 

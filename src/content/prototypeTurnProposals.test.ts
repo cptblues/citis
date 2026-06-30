@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { PROTOTYPE_PLACEABLE_TILE_TYPE_IDS } from "./territoryTileDefinitions";
 import { getPrototypeTurnProposals } from "./prototypeTurnProposals";
+import { PROTOTYPE_PLACEABLE_TILE_TYPE_IDS } from "./territoryTileDefinitions";
 
 describe("getPrototypeTurnProposals", () => {
-  it("propose deux tuiles au premier tour", () => {
+  it("propose trois tuiles au premier tour", () => {
     expect(getPrototypeTurnProposals(1)).toHaveLength(3);
   });
 
@@ -16,7 +16,16 @@ describe("getPrototypeTurnProposals", () => {
     }
   });
 
-  it("cycle lorsque les séries sont épuisées", () => {
-    expect(getPrototypeTurnProposals(4)).toEqual(getPrototypeTurnProposals(1));
+  it("fait défiler les tuiles disponibles", () => {
+    expect(getPrototypeTurnProposals(4)).toEqual(["field", "orchard", "farm"]);
+  });
+
+  it("cycle lorsque toutes les tuiles ont été parcourues", () => {
+    const firstTurnAfterFullCycle =
+      PROTOTYPE_PLACEABLE_TILE_TYPE_IDS.length + 1;
+
+    expect(getPrototypeTurnProposals(firstTurnAfterFullCycle)).toEqual(
+      getPrototypeTurnProposals(1),
+    );
   });
 });
