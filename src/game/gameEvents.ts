@@ -1,5 +1,6 @@
 import type { PrototypePlaceableTileTypeId } from "../content/territoryTileDefinitions";
 import type { StructureTypeId } from "../engine/structure";
+import type { PrototypeUpgradeTypeId } from "../content/territoryUpgradeDefinitions";
 
 /**
  * Evénement historique utilisé par PrototypeScene pour changer de mode bâtiment.
@@ -28,4 +29,19 @@ export const TERRITORY_TILE_PLACED_EVENT = "citis:territory-tile-placed";
 export interface TerritoryTilePlacedPayload {
   cellId: string;
   tileTypeId: PrototypePlaceableTileTypeId;
+}
+
+export const SET_SELECTED_UPGRADE_TYPE_EVENT =
+  "citis:set-selected-upgrade-type";
+
+export const SET_IMPROVEMENT_ENABLED_EVENT = "citis:set-improvement-enabled";
+
+export const TERRITORY_UPGRADE_APPLIED_EVENT =
+  "citis:territory-upgrade-applied";
+
+export type SelectedUpgradeTypeId = PrototypeUpgradeTypeId | null;
+
+export interface TerritoryUpgradeAppliedPayload {
+  tileId: string;
+  upgradeTypeId: PrototypeUpgradeTypeId;
 }

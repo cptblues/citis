@@ -204,3 +204,21 @@ h2 {
   font-weight: 600;
   white-space: nowrap;
 }
+
+.improvement-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 12px;
+  border-left: 1px solid #cad4cb;
+}
+
+.improvement-panel > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.improvement-panel > div small {
+  color: #637066;
+  font-size: 0.72rem;
+}

@@ -1,7 +1,10 @@
 import { GameViewport } from "../game/GameViewport";
 import { useState } from "react";
 
-import type { SelectedTileTypeId } from "../game/gameEvents";
+import type {
+  SelectedTileTypeId,
+  SelectedUpgradeTypeId,
+} from "../game/gameEvents";
 
 import { getPrototypeTurnProposals } from "../content/prototypeTurnProposals";
 import { getTerritoryTileDefinition } from "../content/territoryTileDefinitions";
@@ -9,7 +12,10 @@ import {
   createInitialTurnState,
   endTurn,
   markPlacementCompleted,
+  markImprovementCompleted,
 } from "../engine/turn";
+
+import { TERRITORY_UPGRADE_DEFINITIONS } from "../content/territoryUpgradeDefinitions";
 
 import "./App.css";
 
@@ -22,6 +28,8 @@ export function App() {
   const [turnState, setTurnState] = useState(createInitialTurnState);
 
   const proposals = getPrototypeTurnProposals(turnState.number);
+  const [selectedUpgradeTypeId, setSelectedUpgradeTypeId] =
+    useState<SelectedUpgradeTypeId>(null);
 
   return (
     <main className="app-shell">
@@ -100,6 +108,37 @@ export function App() {
             })}
           </div>
 
+          <div className="improvement-panel">
+            <div>
+              <strong>Amélioration facultative</strong>
+
+              <small>Après avoir posé une tuile</small>
+            </div>
+
+            <button
+              type="button"
+              className={
+                selectedUpgradeTypeId === "forest-trail"
+                  ? "build-button build-button--active"
+                  : "build-button"
+              }
+              disabled={
+                !turnState.placementCompleted || turnState.improvementCompleted
+              }
+              onClick={() => {
+                setSelectedUpgradeTypeId((currentUpgradeTypeId) =>
+                  currentUpgradeTypeId === "forest-trail"
+                    ? null
+                    : "forest-trail",
+                );
+              }}
+            >
+              <span>{TERRITORY_UPGRADE_DEFINITIONS["forest-trail"].label}</span>
+
+              <small className="proposal-resources">Forêt · Bonheur +2</small>
+            </button>
+          </div>
+
           <button
             type="button"
             className="end-turn-button"
@@ -108,6 +147,7 @@ export function App() {
               setTurnState((currentState) => endTurn(currentState));
 
               setSelectedTileTypeId(null);
+              setSelectedUpgradeTypeId(null);
             }}
           >
             Terminer le tour
@@ -121,8 +161,18 @@ export function App() {
             setTurnState((currentState) =>
               markPlacementCompleted(currentState),
             );
-
             setSelectedTileTypeId(null);
+            setSelectedUpgradeTypeId(null);
+          }}
+          selectedUpgradeTypeId={selectedUpgradeTypeId}
+          improvementEnabled={
+            turnState.placementCompleted && !turnState.improvementCompleted
+          }
+          onUpgradeApplied={() => {
+            setTurnState((currentState) =>
+              markImprovementCompleted(currentState),
+            );
+            setSelectedUpgradeTypeId(null);
           }}
         />
       </section>

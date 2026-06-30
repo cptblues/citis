@@ -5,6 +5,8 @@ import {
   type TerritoryAdjacencySynergyDefinition,
 } from "./synergies";
 
+import type { TerritoryUpgradeDefinitions } from "./upgrades";
+
 export interface TerritoryResources {
   food: number;
   energy: number;
@@ -33,6 +35,7 @@ export function calculateTerritoryResources(
   state: BoardState,
   definitions: TerritoryResourceDefinitions,
   synergyDefinitions: readonly TerritoryAdjacencySynergyDefinition[],
+  upgradeDefinitions: TerritoryUpgradeDefinitions = {},
 ): TerritoryResources {
   const resources = createEmptyTerritoryResources();
 
@@ -50,6 +53,24 @@ export function calculateTerritoryResources(
     resources.nature += definition.baseResources.nature;
 
     resources.happiness += definition.baseResources.happiness;
+
+    for (const upgradeId of tile.upgradeIds) {
+      const upgradeDefinition = upgradeDefinitions[upgradeId];
+
+      if (upgradeDefinition === undefined) {
+        throw new Error(
+          `Définition d'amélioration manquante pour ${upgradeId}`,
+        );
+      }
+
+      resources.food += upgradeDefinition.resourceBonus.food;
+
+      resources.energy += upgradeDefinition.resourceBonus.energy;
+
+      resources.nature += upgradeDefinition.resourceBonus.nature;
+
+      resources.happiness += upgradeDefinition.resourceBonus.happiness;
+    }
   }
 
   const activeSynergies = calculateTerritorySynergies(

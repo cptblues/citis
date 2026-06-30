@@ -1,6 +1,7 @@
 export interface TurnState {
   number: number;
   placementCompleted: boolean;
+  improvementCompleted: boolean;
 }
 
 /**
@@ -10,6 +11,7 @@ export function createInitialTurnState(): TurnState {
   return {
     number: 1,
     placementCompleted: false,
+    improvementCompleted: false,
   };
 }
 
@@ -45,5 +47,17 @@ export function endTurn(state: TurnState): TurnState {
   return {
     number: state.number + 1,
     placementCompleted: false,
+    improvementCompleted: false,
+  };
+}
+
+export function markImprovementCompleted(state: TurnState): TurnState {
+  if (!state.placementCompleted || state.improvementCompleted) {
+    return state;
+  }
+
+  return {
+    ...state,
+    improvementCompleted: true,
   };
 }

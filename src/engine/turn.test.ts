@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createInitialTurnState,
   endTurn,
+  markImprovementCompleted,
   markPlacementCompleted,
 } from "./turn";
 
@@ -11,6 +12,7 @@ describe("turn", () => {
     expect(createInitialTurnState()).toEqual({
       number: 1,
       placementCompleted: false,
+      improvementCompleted: false,
     });
   });
 
@@ -28,6 +30,17 @@ describe("turn", () => {
     expect(endTurn(completedState)).toEqual({
       number: 2,
       placementCompleted: false,
+      improvementCompleted: false,
     });
+  });
+});
+
+it("autorise une amélioration après le placement", () => {
+  const placementState = markPlacementCompleted(createInitialTurnState());
+
+  expect(markImprovementCompleted(placementState)).toEqual({
+    number: 1,
+    placementCompleted: true,
+    improvementCompleted: true,
   });
 });

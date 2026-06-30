@@ -7,6 +7,11 @@ import {
   SET_PLACEMENT_ENABLED_EVENT,
   TERRITORY_TILE_PLACED_EVENT,
   type TerritoryTilePlacedPayload,
+  SET_IMPROVEMENT_ENABLED_EVENT,
+  SET_SELECTED_UPGRADE_TYPE_EVENT,
+  TERRITORY_UPGRADE_APPLIED_EVENT,
+  type SelectedUpgradeTypeId,
+  type TerritoryUpgradeAppliedPayload,
 } from "./gameEvents";
 
 import { createPhaserGame } from "./createPhaserGame";
@@ -15,6 +20,9 @@ interface GameViewportProps {
   selectedTileTypeId: SelectedTileTypeId;
   placementEnabled: boolean;
   onTilePlaced: (payload: TerritoryTilePlacedPayload) => void;
+  selectedUpgradeTypeId: SelectedUpgradeTypeId;
+  improvementEnabled: boolean;
+  onUpgradeApplied: (payload: TerritoryUpgradeAppliedPayload) => void;
 }
 
 /**
@@ -24,10 +32,14 @@ export function GameViewport({
   selectedTileTypeId,
   placementEnabled,
   onTilePlaced,
+  selectedUpgradeTypeId,
+  improvementEnabled,
+  onUpgradeApplied,
 }: GameViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const onTilePlacedRef = useRef(onTilePlaced);
+  const onUpgradeAppliedRef = useRef(onUpgradeApplied);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -48,10 +60,19 @@ export function GameViewport({
 
     game.events.on(TERRITORY_TILE_PLACED_EVENT, handleTilePlaced);
 
+    const handleUpgradeApplied = (
+      payload: TerritoryUpgradeAppliedPayload,
+    ): void => {
+      onUpgradeAppliedRef.current(payload);
+    };
+
+    game.events.on(TERRITORY_UPGRADE_APPLIED_EVENT, handleUpgradeApplied);
+
     return () => {
       game.events.off(TERRITORY_TILE_PLACED_EVENT, handleTilePlaced);
       game.destroy(true);
       gameRef.current = null;
+      game.events.off(TERRITORY_UPGRADE_APPLIED_EVENT, handleUpgradeApplied);
     };
   }, []);
 
@@ -78,6 +99,30 @@ export function GameViewport({
 
     game.events.emit(SET_PLACEMENT_ENABLED_EVENT, placementEnabled);
   }, [placementEnabled]);
+
+  useEffect(() => {
+    onUpgradeAppliedRef.current = onUpgradeApplied;
+  }, [onUpgradeApplied]);
+
+  useEffect(() => {
+    const game = gameRef.current;
+
+    if (game === null) {
+      return;
+    }
+
+    game.events.emit(SET_SELECTED_UPGRADE_TYPE_EVENT, selectedUpgradeTypeId);
+  }, [selectedUpgradeTypeId]);
+
+  useEffect(() => {
+    const game = gameRef.current;
+
+    if (game === null) {
+      return;
+    }
+
+    game.events.emit(SET_IMPROVEMENT_ENABLED_EVENT, improvementEnabled);
+  }, [improvementEnabled]);
 
   return (
     <div

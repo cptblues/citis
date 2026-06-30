@@ -17,6 +17,7 @@ import {
   type ActiveTerritorySynergy,
   type TerritoryAdjacencySynergyDefinition,
 } from "./synergies";
+import type { TerritoryUpgradeDefinitions } from "./upgrades";
 
 export interface TerritoryPlacementPreview {
   valid: boolean;
@@ -32,6 +33,7 @@ export function previewTerritoryTilePlacement(
   tileTypeId: PlaceableTerritoryTileTypeId,
   resourceDefinitions: TerritoryResourceDefinitions,
   synergyDefinitions: readonly TerritoryAdjacencySynergyDefinition[],
+  upgradeDefinitions: TerritoryUpgradeDefinitions = {},
 ): TerritoryPlacementPreview {
   const nextState = placeTerritoryTile(cells, state, cellId, tileTypeId);
 
@@ -48,12 +50,14 @@ export function previewTerritoryTilePlacement(
     state,
     resourceDefinitions,
     synergyDefinitions,
+    upgradeDefinitions,
   );
 
   const nextResources = calculateTerritoryResources(
     nextState,
     resourceDefinitions,
     synergyDefinitions,
+    upgradeDefinitions,
   );
 
   const previousSynergyIds = new Set(

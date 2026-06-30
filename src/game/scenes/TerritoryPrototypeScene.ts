@@ -20,9 +20,16 @@ import {
   type SelectedTileTypeId,
   SET_PLACEMENT_ENABLED_EVENT,
   TERRITORY_TILE_PLACED_EVENT,
+  SET_IMPROVEMENT_ENABLED_EVENT,
+  SET_SELECTED_UPGRADE_TYPE_EVENT,
+  TERRITORY_UPGRADE_APPLIED_EVENT,
+  type SelectedUpgradeTypeId,
 } from "../gameEvents";
 
-import { calculateTerritoryResources } from "../../engine/resources";
+import {
+  calculateTerritoryResources,
+  calculateTerritoryResourceDelta,
+} from "../../engine/resources";
 
 import { TERRITORY_SYNERGY_DEFINITIONS } from "../../content/territorySynergyDefinitions";
 
@@ -38,6 +45,15 @@ import {
   showResourceDeltaFeedback,
   showSynergyFeedback,
 } from "../rendering/territoryFeedback";
+
+import { TERRITORY_UPGRADE_DEFINITIONS } from "../../content/territoryUpgradeDefinitions";
+
+import {
+  applyTerritoryUpgrade,
+  canApplyTerritoryUpgrade,
+} from "../../engine/upgrades";
+
+import { createTerritoryUpgradeContent } from "../rendering/territoryUpgradeContent";
 
 const MAP_CENTER_X = 480;
 const MAP_CENTER_Y = 350;
@@ -92,6 +108,15 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
   private placementPreviewText!: Phaser.GameObjects.Text;
 
   private previewSynergyCellIds = new Set<string>();
+
+  private selectedUpgradeTypeId: SelectedUpgradeTypeId = null;
+
+  private improvementEnabled = false;
+
+  private readonly placedUpgradeViews = new Map<
+    string,
+    Phaser.GameObjects.Container
+  >();
 
   /**
    * Déclare la clé de scène utilisée par la configuration Phaser.
@@ -174,6 +199,18 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       this,
     );
 
+    this.game.events.on(
+      SET_SELECTED_UPGRADE_TYPE_EVENT,
+      this.handleSelectedUpgradeTypeChanged,
+      this,
+    );
+
+    this.game.events.on(
+      SET_IMPROVEMENT_ENABLED_EVENT,
+      this.handleImprovementEnabledChanged,
+      this,
+    );
+
     this.drawBoard();
   }
 
@@ -235,7 +272,11 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
 
     graphics.on("pointerover", () => {
       this.hoveredCellId = cell.id;
-      this.refreshPlacementPreview(cell);
+      if (this.selectedUpgradeTypeId !== null) {
+        this.refreshUpgradePreview(cell);
+      } else {
+        this.refreshPlacementPreview(cell);
+      }
       this.redrawAllCells();
     });
 
@@ -248,6 +289,11 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     });
 
     graphics.on("pointerdown", () => {
+      if (this.selectedUpgradeTypeId !== null) {
+        this.tryApplySelectedUpgrade(cell);
+        return;
+      }
+
       if (!this.availableCellIds.has(cell.id)) {
         return;
       }
@@ -277,6 +323,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
         selectedTileTypeId,
         TERRITORY_TILE_DEFINITIONS,
         TERRITORY_SYNERGY_DEFINITIONS,
+        TERRITORY_UPGRADE_DEFINITIONS,
       );
 
       if (!placementPreview.valid) {
@@ -437,6 +484,21 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       strokeWidth = SYNERGY_PREVIEW_STROKE_WIDTH;
     }
 
+    if (
+      placedTile !== undefined &&
+      this.improvementEnabled &&
+      this.selectedUpgradeTypeId !== null &&
+      canApplyTerritoryUpgrade(
+        this.boardState,
+        placedTile.id,
+        this.selectedUpgradeTypeId,
+        TERRITORY_UPGRADE_DEFINITIONS,
+      )
+    ) {
+      strokeColor = 0xd08b45;
+      strokeWidth = isHovered ? 7 : 5;
+    }
+
     cellView.graphics.clear();
 
     cellView.graphics.fillStyle(fillColor, fillAlpha);
@@ -505,6 +567,17 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       this.handlePlacementEnabledChanged,
       this,
     );
+    this.game.events.off(
+      SET_SELECTED_UPGRADE_TYPE_EVENT,
+      this.handleSelectedUpgradeTypeChanged,
+      this,
+    );
+
+    this.game.events.off(
+      SET_IMPROVEMENT_ENABLED_EVENT,
+      this.handleImprovementEnabledChanged,
+      this,
+    );
   }
 
   /**
@@ -549,7 +622,9 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     } else {
       this.selectedTileTypeId = null;
 
-      this.statusText.setText("Tuile posée · termine le tour");
+      this.statusText.setText(
+        "Tuile posée · améliore une tuile ou termine le tour",
+      );
     }
 
     this.redrawAllCells();
@@ -560,6 +635,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       this.boardState,
       TERRITORY_TILE_DEFINITIONS,
       TERRITORY_SYNERGY_DEFINITIONS,
+      TERRITORY_UPGRADE_DEFINITIONS,
     );
 
     this.resourcesText.setText(
@@ -598,6 +674,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       this.selectedTileTypeId,
       TERRITORY_TILE_DEFINITIONS,
       TERRITORY_SYNERGY_DEFINITIONS,
+      TERRITORY_UPGRADE_DEFINITIONS,
     );
 
     if (!preview.valid) {
@@ -607,5 +684,157 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.previewSynergyCellIds = new Set(preview.affectedCellIds);
 
     this.placementPreviewText.setText(formatPlacementPreview(preview));
+  }
+
+  private handleSelectedUpgradeTypeChanged(
+    upgradeTypeId: SelectedUpgradeTypeId,
+  ): void {
+    if (!this.improvementEnabled) {
+      this.selectedUpgradeTypeId = null;
+      return;
+    }
+
+    this.selectedUpgradeTypeId = upgradeTypeId;
+
+    this.selectedTileTypeId = null;
+
+    this.clearPlacementPreview();
+    this.redrawAllCells();
+
+    if (upgradeTypeId !== null) {
+      this.statusText.setText("Sélectionne une Forêt à améliorer");
+    }
+  }
+
+  private handleImprovementEnabledChanged(improvementEnabled: boolean): void {
+    this.improvementEnabled = improvementEnabled;
+
+    if (!improvementEnabled) {
+      this.selectedUpgradeTypeId = null;
+    }
+
+    this.clearPlacementPreview();
+    this.redrawAllCells();
+  }
+
+  private refreshUpgradePreview(cell: BoardCell): void {
+    const upgradeTypeId = this.selectedUpgradeTypeId;
+
+    if (upgradeTypeId === null || !this.improvementEnabled) {
+      return;
+    }
+
+    const tile = getPlacedTileAt(this.boardState, cell);
+
+    const definition = TERRITORY_UPGRADE_DEFINITIONS[upgradeTypeId];
+
+    if (
+      tile === undefined ||
+      !canApplyTerritoryUpgrade(
+        this.boardState,
+        tile.id,
+        upgradeTypeId,
+        TERRITORY_UPGRADE_DEFINITIONS,
+      )
+    ) {
+      this.placementPreviewText.setText(
+        `${definition.label} : nécessite une Forêt disponible`,
+      );
+
+      return;
+    }
+
+    this.placementPreviewText.setText(`${definition.label} : +2 Bonheur`);
+  }
+
+  private tryApplySelectedUpgrade(cell: BoardCell): void {
+    const upgradeTypeId = this.selectedUpgradeTypeId;
+
+    if (upgradeTypeId === null || !this.improvementEnabled) {
+      return;
+    }
+
+    const tile = getPlacedTileAt(this.boardState, cell);
+
+    if (tile === undefined) {
+      return;
+    }
+
+    const previousResources = calculateTerritoryResources(
+      this.boardState,
+      TERRITORY_TILE_DEFINITIONS,
+      TERRITORY_SYNERGY_DEFINITIONS,
+      TERRITORY_UPGRADE_DEFINITIONS,
+    );
+
+    const nextState = applyTerritoryUpgrade(
+      this.boardState,
+      tile.id,
+      upgradeTypeId,
+      TERRITORY_UPGRADE_DEFINITIONS,
+    );
+
+    if (nextState === this.boardState) {
+      this.statusText.setText(
+        "Cette amélioration ne peut pas être installée ici",
+      );
+
+      return;
+    }
+
+    this.boardState = nextState;
+
+    const nextResources = calculateTerritoryResources(
+      this.boardState,
+      TERRITORY_TILE_DEFINITIONS,
+      TERRITORY_SYNERGY_DEFINITIONS,
+      TERRITORY_UPGRADE_DEFINITIONS,
+    );
+
+    const delta = calculateTerritoryResourceDelta(
+      previousResources,
+      nextResources,
+    );
+
+    const cellView = this.cellViews.get(cell.id);
+
+    if (cellView !== undefined) {
+      const viewKey = `${tile.id}:${upgradeTypeId}`;
+
+      const upgradeView = createTerritoryUpgradeContent(
+        this,
+        upgradeTypeId,
+        cellView.centerX,
+        cellView.centerY,
+      );
+
+      this.placedUpgradeViews.set(viewKey, upgradeView);
+
+      showResourceDeltaFeedback(
+        this,
+        cellView.centerX,
+        cellView.centerY,
+        delta,
+      );
+    }
+
+    this.improvementEnabled = false;
+    this.selectedUpgradeTypeId = null;
+
+    this.refreshResources();
+    this.redrawAllCells();
+
+    const definition = TERRITORY_UPGRADE_DEFINITIONS[upgradeTypeId];
+
+    this.statusText.setText(`${definition.label} installé · termine le tour`);
+
+    this.placementPreviewText.setText(
+      `${definition.label} améliore désormais cette Forêt.`,
+    );
+
+    this.game.events.emit(TERRITORY_UPGRADE_APPLIED_EVENT, {
+      tileId: tile.id,
+      upgradeTypeId,
+    });
   }
 }
