@@ -3,20 +3,16 @@ import {
   canPlaceTerritoryTileConnections,
   type TerritoryConnectionDefinitions,
 } from "./connections";
+import type {
+  PlaceableTerritoryTileTypeId,
+  TerritoryTileTypeId,
+} from "../content/territoryContentCatalog";
 
-export const TERRITORY_TILE_TYPE_IDS = [
-  "town",
-  "prairie",
-  "forest",
-  "river",
-  "field",
-  "orchard",
-  "farm",
-] as const;
-
-export type TerritoryTileTypeId = (typeof TERRITORY_TILE_TYPE_IDS)[number];
-
-export type PlaceableTerritoryTileTypeId = Exclude<TerritoryTileTypeId, "town">;
+export { TERRITORY_TILE_TYPE_IDS } from "../content/territoryContentCatalog";
+export type {
+  PlaceableTerritoryTileTypeId,
+  TerritoryTileTypeId,
+} from "../content/territoryContentCatalog";
 
 export interface BoardCell extends HexCoordinate {
   id: string;
@@ -25,7 +21,7 @@ export interface BoardCell extends HexCoordinate {
 export interface PlacedTerritoryTile extends HexCoordinate {
   id: string;
   typeId: TerritoryTileTypeId;
-  rotation: number;
+  rotation: HexRotation;
   upgradeIds: string[];
 }
 
@@ -111,7 +107,6 @@ export function placeTerritoryTile(
   }
 
   const availableCells = getAvailablePlacementCells(cells, state);
-
   const placementIsAvailable = availableCells.some(
     (availableCell) => availableCell.id === cell.id,
   );

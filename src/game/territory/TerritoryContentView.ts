@@ -25,7 +25,7 @@ export class TerritoryContentView {
     tile: PlacedTerritoryTile,
     cellView: TerritoryCellView,
   ): void {
-    if (tile.typeId === "town" || this.placedTileContentViews.has(tile.id)) {
+    if (this.placedTileContentViews.has(tile.id)) {
       return;
     }
 
@@ -36,10 +36,6 @@ export class TerritoryContentView {
       cellView.centerY,
     );
 
-    if (container === null) {
-      return;
-    }
-
     this.placedTileContentViews.set(tile.id, container);
   }
 
@@ -49,6 +45,7 @@ export class TerritoryContentView {
     cellView: TerritoryCellView,
   ): void {
     const viewKey = `${tileId}:${upgradeTypeId}`;
+
     if (this.placedUpgradeViews.has(viewKey)) {
       return;
     }

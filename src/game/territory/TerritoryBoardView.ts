@@ -3,6 +3,7 @@ import Phaser from "phaser";
 import { getTerritoryTileDefinition } from "../../content/territoryTileDefinitions";
 import { TERRITORY_UPGRADE_DEFINITIONS } from "../../content/territoryUpgradeDefinitions";
 import {
+  createBoardCellId,
   getPlacedTileAt,
   type BoardCell,
   type BoardState,
@@ -10,7 +11,7 @@ import {
 import { axialToPixel, getHexCorners, type HexPoint } from "../../engine/hex";
 import { canApplyTerritoryUpgrade } from "../../engine/upgrades";
 import type { SelectedTileTypeId, SelectedUpgradeTypeId } from "../gameEvents";
-import { createTownContent } from "../rendering/territoryTileContent";
+import { createTerritoryTileContent } from "../rendering/territoryTileContent";
 
 const MAP_CENTER_X = 480;
 const MAP_CENTER_Y = 350;
@@ -71,7 +72,7 @@ export class TerritoryBoardView {
     this.callbacks = callbacks;
 
     this.createCells();
-    this.drawTown();
+    this.drawInitialTileContents();
   }
 
   public redrawAll(): void {
@@ -231,7 +232,7 @@ export class TerritoryBoardView {
 
     if (
       isHovered &&
-      state.selectedTileTypeId === "river" &&
+      state.selectedTileTypeId !== null &&
       state.placementPreviewValid === false
     ) {
       strokeColor = INVALID_PLACEMENT_STROKE_COLOR;
@@ -249,12 +250,23 @@ export class TerritoryBoardView {
     cellView.graphics.strokePoints(cellView.corners, true);
   }
 
-  private drawTown(): void {
-    const townCell = this.cellViews.get("cell:0:0");
-    if (townCell === undefined) {
-      return;
-    }
+  private drawInitialTileContents(): void {
+    const { boardState } = this.getVisualState();
 
-    createTownContent(this.scene, townCell.centerX, townCell.centerY);
+    for (const tile of boardState.placedTiles) {
+      const cellId = createBoardCellId(tile.q, tile.r);
+      const cellView = this.cellViews.get(cellId);
+
+      if (cellView === undefined) {
+        continue;
+      }
+
+      createTerritoryTileContent(
+        this.scene,
+        tile,
+        cellView.centerX,
+        cellView.centerY,
+      );
+    }
   }
 }

@@ -7,7 +7,10 @@ import {
   getTerritoryTileDefinition,
   TERRITORY_TILE_DEFINITIONS,
 } from "../../content/territoryTileDefinitions";
-import { TERRITORY_UPGRADE_DEFINITIONS } from "../../content/territoryUpgradeDefinitions";
+import {
+  getTerritoryUpgradeDefinition,
+  TERRITORY_UPGRADE_DEFINITIONS,
+} from "../../content/territoryUpgradeDefinitions";
 import {
   createInitialBoardState,
   getAvailablePlacementCells,
@@ -39,6 +42,7 @@ import {
 } from "../gameEvents";
 import {
   formatPlacementPreview,
+  formatResourceDelta,
   showResourceDeltaFeedback,
   showSynergyFeedback,
 } from "../rendering/territoryFeedback";
@@ -80,7 +84,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
   public create(): void {
     this.cameras.main.setBackgroundColor("#dfe8dd");
 
-    this.add.text(32, 28, "Rivière orientable", {
+    this.add.text(32, 28, "Catalogue de contenu", {
       color: "#18351f",
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize: "28px",
@@ -90,7 +94,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.add.text(
       32,
       70,
-      "Tourne les segments pour prolonger un cours d’eau continu.",
+      "Les tuiles, améliorations et synergies sont pilotées par la configuration.",
       {
         color: "#4f5e51",
         fontFamily: "Inter, system-ui, sans-serif",
@@ -334,11 +338,13 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       return;
     }
 
+    const selectedDefinition = getTerritoryTileDefinition(
+      this.selectedTileTypeId,
+    );
     const message = preview.valid
       ? formatPlacementPreview(preview)
-      : this.selectedTileTypeId === "river"
-        ? "Connexion invalide · tourne la Rivière pour prolonger le cours d’eau."
-        : "Placement impossible.";
+      : (selectedDefinition.placement.invalidMessage ??
+        "Placement impossible.");
 
     this.placementPreviewView.showPlacement({
       cellView,
@@ -407,7 +413,8 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.boardView.redrawAll();
 
     if (upgradeTypeId !== null) {
-      this.statusText.setText("Sélectionne une Forêt à améliorer");
+      const definition = getTerritoryUpgradeDefinition(upgradeTypeId);
+      this.statusText.setText(definition.ui.selectionMessage);
     }
   }
 
@@ -429,7 +436,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     }
 
     const tile = getPlacedTileAt(this.boardState, cell);
-    const definition = TERRITORY_UPGRADE_DEFINITIONS[upgradeTypeId];
+    const definition = getTerritoryUpgradeDefinition(upgradeTypeId);
 
     if (
       tile === undefined ||
@@ -440,13 +447,16 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
         TERRITORY_UPGRADE_DEFINITIONS,
       )
     ) {
-      this.placementPreviewView.setMessage(
-        `${definition.label} : nécessite une Forêt disponible`,
-      );
+      this.placementPreviewView.setMessage(definition.ui.unavailableMessage);
       return;
     }
 
-    this.placementPreviewView.setMessage(`${definition.label} : +2 Bonheur`);
+    const resourceSummary = formatResourceDelta(definition.resourceBonus).join(
+      " · ",
+    );
+    this.placementPreviewView.setMessage(
+      `${definition.label} : ${resourceSummary}`,
+    );
   }
 
   private tryApplySelectedUpgrade(cell: BoardCell): void {
@@ -509,11 +519,9 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.refreshResources();
     this.boardView.redrawAll();
 
-    const definition = TERRITORY_UPGRADE_DEFINITIONS[upgradeTypeId];
+    const definition = getTerritoryUpgradeDefinition(upgradeTypeId);
     this.statusText.setText(`${definition.label} installé · termine le tour`);
-    this.placementPreviewView.setMessage(
-      `${definition.label} améliore désormais cette Forêt.`,
-    );
+    this.placementPreviewView.setMessage(definition.ui.appliedMessage);
 
     this.game.events.emit(TERRITORY_UPGRADE_APPLIED_EVENT, {
       tileId: tile.id,

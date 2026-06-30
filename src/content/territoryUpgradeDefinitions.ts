@@ -1,21 +1,55 @@
-import type { TerritoryUpgradeDefinitions } from "../engine/upgrades";
+import type {
+  TerritoryUpgradeDefinition,
+  TerritoryUpgradeDefinitions,
+} from "../engine/upgrades";
+import {
+  TERRITORY_CONTENT,
+  TERRITORY_UPGRADE_TYPE_IDS,
+  type TerritoryUpgradeRendererKey,
+  type TerritoryUpgradeTypeId,
+} from "./territoryContentCatalog";
+import { getTerritoryTileTypeIdsWithTags } from "./territoryTileDefinitions";
 
-export const PROTOTYPE_UPGRADE_TYPE_IDS = ["forest-trail"] as const;
+export type PrototypeUpgradeTypeId = TerritoryUpgradeTypeId;
 
-export type PrototypeUpgradeTypeId =
-  (typeof PROTOTYPE_UPGRADE_TYPE_IDS)[number];
+export interface PrototypeTerritoryUpgradeDefinition extends TerritoryUpgradeDefinition {
+  renderer: TerritoryUpgradeRendererKey;
+  targetLabel: string;
+  ui: {
+    selectionMessage: string;
+    unavailableMessage: string;
+    appliedMessage: string;
+  };
+}
 
-export const TERRITORY_UPGRADE_DEFINITIONS = {
-  "forest-trail": {
-    id: "forest-trail",
-    label: "Sentier forestier",
-    description: "Rend la forêt accessible aux habitants.",
-    allowedTileTypeIds: ["forest"],
-    resourceBonus: {
-      food: 0,
-      energy: 0,
-      nature: 0,
-      happiness: 2,
-    },
-  },
-} as const satisfies TerritoryUpgradeDefinitions;
+export const PROTOTYPE_UPGRADE_TYPE_IDS = TERRITORY_UPGRADE_TYPE_IDS;
+
+export const TERRITORY_UPGRADE_DEFINITIONS = Object.fromEntries(
+  PROTOTYPE_UPGRADE_TYPE_IDS.map((upgradeTypeId) => {
+    const contentDefinition = TERRITORY_CONTENT.upgrades[upgradeTypeId];
+
+    const definition: PrototypeTerritoryUpgradeDefinition = {
+      id: upgradeTypeId,
+      label: contentDefinition.label,
+      description: contentDefinition.description,
+      allowedTileTypeIds: getTerritoryTileTypeIdsWithTags(
+        contentDefinition.target.requiredTags,
+      ),
+      resourceBonus: contentDefinition.resourceBonus,
+      renderer: contentDefinition.renderer,
+      targetLabel: contentDefinition.target.label,
+      ui: contentDefinition.ui,
+    };
+
+    return [upgradeTypeId, definition] as const;
+  }),
+) as unknown as Readonly<
+  Record<PrototypeUpgradeTypeId, PrototypeTerritoryUpgradeDefinition>
+> &
+  TerritoryUpgradeDefinitions;
+
+export function getTerritoryUpgradeDefinition(
+  upgradeTypeId: PrototypeUpgradeTypeId,
+): PrototypeTerritoryUpgradeDefinition {
+  return TERRITORY_UPGRADE_DEFINITIONS[upgradeTypeId];
+}

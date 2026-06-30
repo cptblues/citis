@@ -1,9 +1,12 @@
-import type {
-  PlaceableTerritoryTileTypeId,
-  TerritoryTileTypeId,
-} from "../engine/board";
-
+import {
+  TERRITORY_CONTENT,
+  TERRITORY_TILE_TYPE_IDS,
+  type PlaceableTerritoryTileTypeId,
+  type TerritoryTileRendererKey,
+  type TerritoryTileTypeId,
+} from "./territoryContentCatalog";
 import type { TerritoryResources } from "../engine/resources";
+import type { HexSide } from "../engine/hex";
 
 export interface TerritoryTileDefinition {
   label: string;
@@ -11,84 +14,56 @@ export interface TerritoryTileDefinition {
   hoverColor: number;
   strokeColor: number;
   baseResources: TerritoryResources;
+  tags: readonly string[];
+  renderer: TerritoryTileRendererKey;
+  placement: {
+    placeable: boolean;
+    rotationEnabled: boolean;
+    previewContentEnabled: boolean;
+    invalidMessage: string | null;
+    connection: {
+      connectionType: string;
+      baseSides: readonly HexSide[];
+    } | null;
+  };
+  proposals: {
+    enabled: boolean;
+    order: number;
+  };
 }
 
-export const PROTOTYPE_PLACEABLE_TILE_TYPE_IDS = [
-  "prairie",
-  "forest",
-  "river",
-] as const satisfies readonly PlaceableTerritoryTileTypeId[];
+export const TERRITORY_TILE_DEFINITIONS = TERRITORY_CONTENT.tiles;
 
-export type PrototypePlaceableTileTypeId =
-  (typeof PROTOTYPE_PLACEABLE_TILE_TYPE_IDS)[number];
+export const PROTOTYPE_PLACEABLE_TILE_TYPE_IDS = TERRITORY_TILE_TYPE_IDS.filter(
+  (tileTypeId): tileTypeId is PlaceableTerritoryTileTypeId =>
+    TERRITORY_TILE_DEFINITIONS[tileTypeId].placement.placeable,
+).sort(
+  (firstTileTypeId, secondTileTypeId) =>
+    TERRITORY_TILE_DEFINITIONS[firstTileTypeId].proposals.order -
+    TERRITORY_TILE_DEFINITIONS[secondTileTypeId].proposals.order,
+);
 
-export const TERRITORY_TILE_DEFINITIONS: Partial<
-  Record<TerritoryTileTypeId, TerritoryTileDefinition>
-> = {
-  town: {
-    label: "Bourg",
-    fillColor: 0xf2d492,
-    hoverColor: 0xf7dfaa,
-    strokeColor: 0x18351f,
-    baseResources: {
-      food: 0,
-      energy: 0,
-      nature: 0,
-      happiness: 0,
-    },
-  },
-
-  prairie: {
-    label: "Prairie",
-    fillColor: 0xa9cf7c,
-    hoverColor: 0xc1df9d,
-    strokeColor: 0x4b793d,
-    baseResources: {
-      food: 0,
-      energy: 0,
-      nature: 2,
-      happiness: 2,
-    },
-  },
-
-  forest: {
-    label: "Forêt",
-    fillColor: 0x659765,
-    hoverColor: 0x7ead7e,
-    strokeColor: 0x28563a,
-    baseResources: {
-      food: 0,
-      energy: 0,
-      nature: 4,
-      happiness: 1,
-    },
-  },
-
-  river: {
-    label: "Rivière",
-    fillColor: 0x78bfd2,
-    hoverColor: 0xa1dbe5,
-    strokeColor: 0x2e7185,
-    baseResources: {
-      food: 0,
-      energy: 0,
-      nature: 3,
-      happiness: 1,
-    },
-  },
-};
+export type PrototypePlaceableTileTypeId = PlaceableTerritoryTileTypeId;
 
 /**
- * Retourne la définition visuelle d'une tuile de territoire connue du prototype.
+ * Retourne la définition complète d'une tuile du catalogue.
  */
 export function getTerritoryTileDefinition(
   tileTypeId: TerritoryTileTypeId,
 ): TerritoryTileDefinition {
-  const definition = TERRITORY_TILE_DEFINITIONS[tileTypeId];
+  return TERRITORY_TILE_DEFINITIONS[tileTypeId];
+}
 
-  if (definition === undefined) {
-    throw new Error(`Définition manquante pour la tuile ${tileTypeId}`);
-  }
+/**
+ * Liste les types de tuiles possédant tous les tags demandés.
+ */
+export function getTerritoryTileTypeIdsWithTags(
+  requiredTags: readonly string[],
+): TerritoryTileTypeId[] {
+  return TERRITORY_TILE_TYPE_IDS.filter((tileTypeId) => {
+    const tileTags: readonly string[] =
+      TERRITORY_TILE_DEFINITIONS[tileTypeId].tags;
 
-  return definition;
+    return requiredTags.every((requiredTag) => tileTags.includes(requiredTag));
+  });
 }

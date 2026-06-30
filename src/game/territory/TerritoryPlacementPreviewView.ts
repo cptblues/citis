@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 
+import { getTerritoryTileDefinition } from "../../content/territoryTileDefinitions";
 import type { HexRotation } from "../../engine/hex";
 import type { SelectedTileTypeId } from "../gameEvents";
 import { createTerritoryTilePreviewContent } from "../rendering/territoryTileContent";
@@ -58,7 +59,9 @@ export class TerritoryPlacementPreviewView {
     this.placementPreviewValid = options.valid;
     this.previewText.setText(options.message);
 
-    if (options.tileTypeId !== "river") {
+    const definition = getTerritoryTileDefinition(options.tileTypeId);
+
+    if (!definition.placement.previewContentEnabled) {
       return;
     }
 
@@ -69,10 +72,6 @@ export class TerritoryPlacementPreviewView {
       options.cellView.centerX,
       options.cellView.centerY,
     );
-
-    if (ghost === null) {
-      return;
-    }
 
     ghost.setAlpha(options.valid ? 0.65 : 0.25).setDepth(15);
     this.placementGhostView = ghost;
