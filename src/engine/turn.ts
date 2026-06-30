@@ -37,6 +37,23 @@ export function canEndTurn(state: TurnState): boolean {
 }
 
 /**
+ * Indique si le joueur se trouve sur le dernier tour du scénario.
+ */
+export function isFinalTurn(state: TurnState, maximumTurns: number): boolean {
+  return state.number >= maximumTurns;
+}
+
+/**
+ * Indique si la partie peut afficher son bilan.
+ */
+export function canCompleteScenario(
+  state: TurnState,
+  maximumTurns: number,
+): boolean {
+  return canEndTurn(state) && isFinalTurn(state, maximumTurns);
+}
+
+/**
  * Avance au tour suivant uniquement lorsque le placement est terminé.
  */
 export function endTurn(state: TurnState): TurnState {

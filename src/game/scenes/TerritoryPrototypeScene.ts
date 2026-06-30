@@ -35,6 +35,7 @@ import {
   SET_SELECTED_TILE_ROTATION_EVENT,
   SET_SELECTED_TILE_TYPE_EVENT,
   SET_SELECTED_UPGRADE_TYPE_EVENT,
+  TERRITORY_SUMMARY_CHANGED_EVENT,
   TERRITORY_TILE_PLACED_EVENT,
   TERRITORY_UPGRADE_APPLIED_EVENT,
   type SelectedTileTypeId,
@@ -84,7 +85,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
   public create(): void {
     this.cameras.main.setBackgroundColor("#dfe8dd");
 
-    this.add.text(32, 28, "Catalogue de contenu", {
+    this.add.text(32, 28, "Saint-Verdant", {
       color: "#18351f",
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize: "28px",
@@ -94,7 +95,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.add.text(
       32,
       70,
-      "Les tuiles, améliorations et synergies sont pilotées par la configuration.",
+      "Développe une commune équilibrée avant la fin du quinzième tour.",
       {
         color: "#4f5e51",
         fontFamily: "Inter, system-ui, sans-serif",
@@ -558,6 +559,11 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
         `Bonheur : ${resources.happiness}`,
       ].join(" · "),
     );
+
+    this.game.events.emit(TERRITORY_SUMMARY_CHANGED_EVENT, {
+      resources,
+      placedTileCount: this.boardState.placedTiles.length,
+    });
   }
 
   private handleSceneShutdown(): void {
