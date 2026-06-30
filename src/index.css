@@ -1,6 +1,11 @@
 :root {
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
     sans-serif;
   color: #203126;
   background: #e8eee5;
@@ -16,6 +21,7 @@
 
 html {
   min-width: 320px;
+  min-height: 100%;
   background: #e8eee5;
 }
 
@@ -23,6 +29,14 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  background:
+    radial-gradient(circle at 15% 0%, rgb(255 255 255 / 68%), transparent 34%),
+    radial-gradient(
+      circle at 88% 100%,
+      rgb(191 211 181 / 48%),
+      transparent 38%
+    ),
+    #e8eee5;
 }
 
 button,
@@ -30,4 +44,13 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+button:focus-visible {
+  outline: 3px solid rgb(76 116 82 / 34%);
+  outline-offset: 2px;
+}
+
+#root {
+  min-height: 100vh;
 }
