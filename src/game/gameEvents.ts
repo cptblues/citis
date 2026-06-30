@@ -2,13 +2,6 @@ import type { PrototypePlaceableTileTypeId } from "../content/territoryTileDefin
 import type { PrototypeUpgradeTypeId } from "../content/territoryUpgradeDefinitions";
 import type { HexRotation } from "../engine/hex";
 import type { TerritoryResources } from "../engine/resources";
-import type { StructureTypeId } from "../engine/structure";
-
-/**
- * Événement historique utilisé par PrototypeScene pour changer de mode bâtiment.
- */
-export const SET_BUILD_MODE_EVENT = "citis:set-build-mode";
-export type BuildMode = StructureTypeId | null;
 
 /**
  * Événement envoyé par React pour synchroniser la proposition sélectionnée.
