@@ -5,7 +5,12 @@ import {
   getHexCoordinatesInRadius,
   getHexCorners,
   getHexDistance,
+  getHexNeighbor,
+  getHexSideBetween,
   getItemsInHexRadius,
+  getNextHexRotation,
+  getOppositeHexSide,
+  rotateHexSide,
 } from "./hex";
 
 describe("getHexCorners", () => {
@@ -98,5 +103,30 @@ describe("getItemsInHexRadius", () => {
       "neighbor-a",
       "neighbor-b",
     ]);
+  });
+});
+
+describe("hex sides", () => {
+  it("retrouve une voisine par son côté", () => {
+    expect(getHexNeighbor({ q: 0, r: 0 }, 1)).toEqual({
+      q: 1,
+      r: -1,
+    });
+  });
+
+  it("retrouve le côté entre deux voisines", () => {
+    expect(getHexSideBetween({ q: 0, r: 0 }, { q: -1, r: 1 })).toBe(4);
+  });
+
+  it("retrouve le côté opposé", () => {
+    expect(getOppositeHexSide(2)).toBe(5);
+  });
+
+  it("fait tourner un côté", () => {
+    expect(rotateHexSide(5, 1)).toBe(0);
+  });
+
+  it("cycle les rotations", () => {
+    expect(getNextHexRotation(5)).toBe(0);
   });
 });

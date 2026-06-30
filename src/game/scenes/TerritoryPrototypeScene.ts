@@ -10,7 +10,12 @@ import {
   placeTerritoryTile,
   type PlacedTerritoryTile,
 } from "../../engine/board";
-import { axialToPixel, getHexCorners, type HexPoint } from "../../engine/hex";
+import {
+  axialToPixel,
+  getHexCorners,
+  type HexPoint,
+  type HexRotation,
+} from "../../engine/hex";
 import {
   getTerritoryTileDefinition,
   TERRITORY_TILE_DEFINITIONS,
@@ -24,6 +29,7 @@ import {
   SET_SELECTED_UPGRADE_TYPE_EVENT,
   TERRITORY_UPGRADE_APPLIED_EVENT,
   type SelectedUpgradeTypeId,
+  SET_SELECTED_TILE_ROTATION_EVENT,
 } from "../gameEvents";
 
 import {
@@ -38,6 +44,7 @@ import { previewTerritoryTilePlacement } from "../../engine/placementPreview";
 import {
   createTerritoryTileContent,
   createTownContent,
+  createTerritoryTilePreviewContent,
 } from "../rendering/territoryTileContent";
 
 import {
@@ -54,6 +61,8 @@ import {
 } from "../../engine/upgrades";
 
 import { createTerritoryUpgradeContent } from "../rendering/territoryUpgradeContent";
+
+import { TERRITORY_CONNECTION_DEFINITIONS } from "../../content/territoryConnectionDefinitions";
 
 const MAP_CENTER_X = 480;
 const MAP_CENTER_Y = 350;
@@ -118,6 +127,12 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     Phaser.GameObjects.Container
   >();
 
+  private selectedTileRotation: HexRotation = 0;
+
+  private placementGhostView: Phaser.GameObjects.Container | null = null;
+
+  private placementPreviewValid: boolean | null = null;
+
   /**
    * Déclare la clé de scène utilisée par la configuration Phaser.
    */
@@ -133,7 +148,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
   public create(): void {
     this.cameras.main.setBackgroundColor("#dfe8dd");
 
-    this.add.text(32, 28, "Premières synergies", {
+    this.add.text(32, 28, "Rivière orientable", {
       color: "#18351f",
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize: "28px",
@@ -143,7 +158,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.add.text(
       32,
       70,
-      "Survole un emplacement pour prévisualiser les bonus de voisinage.",
+      "Tourne les segments pour prolonger un cours d’eau continu.",
       {
         color: "#4f5e51",
         fontFamily: "Inter, system-ui, sans-serif",
@@ -208,6 +223,12 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.game.events.on(
       SET_IMPROVEMENT_ENABLED_EVENT,
       this.handleImprovementEnabledChanged,
+      this,
+    );
+
+    this.game.events.on(
+      SET_SELECTED_TILE_ROTATION_EVENT,
+      this.handleSelectedTileRotationChanged,
       this,
     );
 
@@ -307,7 +328,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       }
 
       if (this.selectedTileTypeId === null) {
-        this.statusText.setText("Choisis d’abord Prairie ou Forêt");
+        this.statusText.setText("Choisis d’abord une proposition");
 
         return;
       }
@@ -315,6 +336,8 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       const previousTileCount = this.boardState.placedTiles.length;
 
       const selectedTileTypeId = this.selectedTileTypeId;
+
+      const selectedTileRotation = this.selectedTileRotation;
 
       const placementPreview = previewTerritoryTilePlacement(
         prototypeBoardCells,
@@ -324,6 +347,8 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
         TERRITORY_TILE_DEFINITIONS,
         TERRITORY_SYNERGY_DEFINITIONS,
         TERRITORY_UPGRADE_DEFINITIONS,
+        selectedTileRotation,
+        TERRITORY_CONNECTION_DEFINITIONS,
       );
 
       if (!placementPreview.valid) {
@@ -335,7 +360,11 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
         this.boardState,
         cell.id,
         selectedTileTypeId,
+        selectedTileRotation,
+        TERRITORY_CONNECTION_DEFINITIONS,
       );
+
+      this.selectedTileRotation = 0;
 
       const resourceDelta = placementPreview.resourceDelta;
 
@@ -389,6 +418,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       this.game.events.emit(TERRITORY_TILE_PLACED_EVENT, {
         cellId: cell.id,
         tileTypeId: selectedTileTypeId,
+        rotation: selectedTileRotation,
       });
 
       this.refreshAvailableCells();
@@ -402,8 +432,8 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
 
       this.statusText.setText(
         synergySummary.length > 0
-          ? `${definition.label} posée · ${synergySummary} ! · termine le tour`
-          : `${definition.label} posée · termine le tour`,
+          ? `${definition.label} posée · ${synergySummary} ! · améliore une tuile ou termine le tour`
+          : `${definition.label} posée · améliore une tuile ou termine le tour`,
       );
     });
 
@@ -499,6 +529,15 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       strokeWidth = isHovered ? 7 : 5;
     }
 
+    if (
+      isHovered &&
+      this.selectedTileTypeId === "river" &&
+      this.placementPreviewValid === false
+    ) {
+      strokeColor = 0xb54f4f;
+      strokeWidth = 6;
+    }
+
     cellView.graphics.clear();
 
     cellView.graphics.fillStyle(fillColor, fillAlpha);
@@ -572,10 +611,14 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       this.handleSelectedUpgradeTypeChanged,
       this,
     );
-
     this.game.events.off(
       SET_IMPROVEMENT_ENABLED_EVENT,
       this.handleImprovementEnabledChanged,
+      this,
+    );
+    this.game.events.off(
+      SET_SELECTED_TILE_ROTATION_EVENT,
+      this.handleSelectedTileRotationChanged,
       this,
     );
   }
@@ -650,6 +693,9 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
 
   private clearPlacementPreview(): void {
     this.previewSynergyCellIds.clear();
+    this.placementGhostView?.destroy(true);
+    this.placementGhostView = null;
+    this.placementPreviewValid = null;
 
     this.placementPreviewText.setText(
       "Sélectionne une proposition et survole un emplacement.",
@@ -675,9 +721,21 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       TERRITORY_TILE_DEFINITIONS,
       TERRITORY_SYNERGY_DEFINITIONS,
       TERRITORY_UPGRADE_DEFINITIONS,
+      this.selectedTileRotation,
+      TERRITORY_CONNECTION_DEFINITIONS,
     );
 
+    this.placementPreviewValid = preview.valid;
+
+    this.showPlacementGhost(cell, preview.valid);
+
     if (!preview.valid) {
+      this.placementPreviewText.setText(
+        this.selectedTileTypeId === "river"
+          ? "Connexion invalide · tourne la Rivière pour prolonger le cours d’eau."
+          : "Placement impossible.",
+      );
+
       return;
     }
 
@@ -836,5 +894,49 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       tileId: tile.id,
       upgradeTypeId,
     });
+  }
+
+  private handleSelectedTileRotationChanged(rotation: HexRotation): void {
+    this.selectedTileRotation = rotation;
+
+    if (this.hoveredCellId !== null) {
+      const hoveredCell = this.cellViews.get(this.hoveredCellId);
+
+      if (hoveredCell !== undefined) {
+        this.refreshPlacementPreview(hoveredCell.cell);
+      }
+    } else {
+      this.clearPlacementPreview();
+    }
+
+    this.redrawAllCells();
+  }
+
+  private showPlacementGhost(cell: BoardCell, valid: boolean): void {
+    if (this.selectedTileTypeId !== "river") {
+      return;
+    }
+
+    const cellView = this.cellViews.get(cell.id);
+
+    if (cellView === undefined) {
+      return;
+    }
+
+    const ghost = createTerritoryTilePreviewContent(
+      this,
+      "river",
+      this.selectedTileRotation,
+      cellView.centerX,
+      cellView.centerY,
+    );
+
+    if (ghost === null) {
+      return;
+    }
+
+    ghost.setAlpha(valid ? 0.65 : 0.25).setDepth(15);
+
+    this.placementGhostView = ghost;
   }
 }

@@ -1,4 +1,8 @@
-import { getHexDistance, type HexCoordinate } from "./hex";
+import { getHexDistance, type HexCoordinate, type HexRotation } from "./hex";
+import {
+  canPlaceTerritoryTileConnections,
+  type TerritoryConnectionDefinitions,
+} from "./connections";
 
 export const TERRITORY_TILE_TYPE_IDS = [
   "town",
@@ -97,6 +101,8 @@ export function placeTerritoryTile(
   state: BoardState,
   cellId: string,
   tileTypeId: PlaceableTerritoryTileTypeId,
+  rotation: HexRotation = 0,
+  connectionDefinitions: TerritoryConnectionDefinitions = {},
 ): BoardState {
   const cell = cells.find((candidate) => candidate.id === cellId);
 
@@ -114,12 +120,24 @@ export function placeTerritoryTile(
     return state;
   }
 
+  if (
+    !canPlaceTerritoryTileConnections(
+      state,
+      cell,
+      tileTypeId,
+      rotation,
+      connectionDefinitions,
+    )
+  ) {
+    return state;
+  }
+
   const placedTile: PlacedTerritoryTile = {
     id: `territory:${tileTypeId}:${cell.q}:${cell.r}`,
     typeId: tileTypeId,
     q: cell.q,
     r: cell.r,
-    rotation: 0,
+    rotation,
     upgradeIds: [],
   };
 

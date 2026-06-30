@@ -29,6 +29,7 @@ export const TERRITORY_TILE_PLACED_EVENT = "citis:territory-tile-placed";
 export interface TerritoryTilePlacedPayload {
   cellId: string;
   tileTypeId: PrototypePlaceableTileTypeId;
+  rotation: HexRotation;
 }
 
 export const SET_SELECTED_UPGRADE_TYPE_EVENT =
@@ -45,3 +46,7 @@ export interface TerritoryUpgradeAppliedPayload {
   tileId: string;
   upgradeTypeId: PrototypeUpgradeTypeId;
 }
+
+import type { HexRotation } from "../engine/hex";
+export const SET_SELECTED_TILE_ROTATION_EVENT =
+  "citis:set-selected-tile-rotation";

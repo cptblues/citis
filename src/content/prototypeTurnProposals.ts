@@ -1,8 +1,9 @@
 import type { PrototypePlaceableTileTypeId } from "./territoryTileDefinitions";
 
 const PROTOTYPE_TURN_PROPOSALS = [
-  ["prairie", "forest"],
-  ["forest", "prairie"],
+  ["prairie", "forest", "river"],
+  ["forest", "river", "prairie"],
+  ["river", "prairie", "forest"],
 ] as const satisfies readonly (readonly PrototypePlaceableTileTypeId[])[];
 
 /**

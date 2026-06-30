@@ -15,6 +15,8 @@ import {
   markImprovementCompleted,
 } from "../engine/turn";
 
+import { getNextHexRotation, type HexRotation } from "../engine/hex";
+
 import { TERRITORY_UPGRADE_DEFINITIONS } from "../content/territoryUpgradeDefinitions";
 
 import "./App.css";
@@ -31,6 +33,9 @@ export function App() {
   const [selectedUpgradeTypeId, setSelectedUpgradeTypeId] =
     useState<SelectedUpgradeTypeId>(null);
 
+  const [selectedTileRotation, setSelectedTileRotation] =
+    useState<HexRotation>(0);
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -39,7 +44,7 @@ export function App() {
           <h1>Citis</h1>
         </div>
 
-        <p className="step-label">Migration 5 · Synergies</p>
+        <p className="step-label">Migration 7 · Rivière orientable</p>
       </header>
 
       <section className="game-card" aria-labelledby="game-title">
@@ -95,6 +100,8 @@ export function App() {
                   disabled={turnState.placementCompleted}
                   onClick={() => {
                     setSelectedTileTypeId(isSelected ? null : tileTypeId);
+
+                    setSelectedTileRotation(0);
                   }}
                 >
                   <small>Proposition {proposalIndex + 1}</small>
@@ -106,6 +113,27 @@ export function App() {
                 </button>
               );
             })}
+          </div>
+
+          <div className="rotation-panel">
+            <strong>Orientation</strong>
+
+            <button
+              type="button"
+              className="build-button"
+              disabled={
+                turnState.placementCompleted || selectedTileTypeId !== "river"
+              }
+              onClick={() => {
+                setSelectedTileRotation((currentRotation) =>
+                  getNextHexRotation(currentRotation),
+                );
+              }}
+            >
+              <span>Tourner la rivière</span>
+
+              <small>Position {selectedTileRotation + 1} / 6</small>
+            </button>
           </div>
 
           <div className="improvement-panel">
@@ -131,6 +159,7 @@ export function App() {
                     ? null
                     : "forest-trail",
                 );
+                setSelectedTileRotation(0);
               }}
             >
               <span>{TERRITORY_UPGRADE_DEFINITIONS["forest-trail"].label}</span>
@@ -148,6 +177,7 @@ export function App() {
 
               setSelectedTileTypeId(null);
               setSelectedUpgradeTypeId(null);
+              setSelectedTileRotation(0);
             }}
           >
             Terminer le tour
@@ -163,6 +193,7 @@ export function App() {
             );
             setSelectedTileTypeId(null);
             setSelectedUpgradeTypeId(null);
+            setSelectedTileRotation(0);
           }}
           selectedUpgradeTypeId={selectedUpgradeTypeId}
           improvementEnabled={
@@ -173,7 +204,9 @@ export function App() {
               markImprovementCompleted(currentState),
             );
             setSelectedUpgradeTypeId(null);
+            setSelectedTileRotation(0);
           }}
+          selectedTileRotation={selectedTileRotation}
         />
       </section>
     </main>

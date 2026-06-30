@@ -61,6 +61,8 @@ export function createTerritoryTileContent(
     addPrairieContent(scene, container);
   } else if (tile.typeId === "forest") {
     addForestContent(scene, container);
+  } else if (tile.typeId === "river") {
+    addRiverContent(scene, container, tile.rotation);
   } else {
     container.destroy();
 
@@ -93,6 +95,39 @@ function addPrairieContent(
   }
 }
 
+function addRiverContent(
+  scene: Phaser.Scene,
+  container: Phaser.GameObjects.Container,
+  rotation: number,
+): void {
+  const river = scene.add.graphics();
+
+  river.lineStyle(18, 0x459bb6, 1);
+
+  drawRiverPath(river);
+
+  const reflection = scene.add.graphics();
+
+  reflection.lineStyle(4, 0xbde8ef, 0.85);
+
+  drawRiverPath(reflection);
+
+  container.add([river, reflection]);
+
+  container.setAngle(-rotation * 60);
+}
+
+function drawRiverPath(graphics: Phaser.GameObjects.Graphics): void {
+  graphics.beginPath();
+  graphics.moveTo(55, 0);
+  graphics.lineTo(32, -3);
+  graphics.lineTo(12, 2);
+  graphics.lineTo(-5, -7);
+  graphics.lineTo(-16, -25);
+  graphics.lineTo(-28, -48);
+  graphics.strokePath();
+}
+
 function addForestContent(
   scene: Phaser.Scene,
   container: Phaser.GameObjects.Container,
@@ -113,4 +148,26 @@ function addForestContent(
 
     container.add([trunk, crown, highlight]);
   }
+}
+
+export function createTerritoryTilePreviewContent(
+  scene: Phaser.Scene,
+  tileTypeId: PlacedTerritoryTile["typeId"],
+  rotation: number,
+  centerX: number,
+  centerY: number,
+): Phaser.GameObjects.Container | null {
+  return createTerritoryTileContent(
+    scene,
+    {
+      id: "territory-preview",
+      typeId: tileTypeId,
+      q: 0,
+      r: 0,
+      rotation,
+      upgradeIds: [],
+    },
+    centerX,
+    centerY,
+  );
 }

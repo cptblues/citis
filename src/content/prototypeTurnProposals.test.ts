@@ -5,7 +5,7 @@ import { getPrototypeTurnProposals } from "./prototypeTurnProposals";
 
 describe("getPrototypeTurnProposals", () => {
   it("propose deux tuiles au premier tour", () => {
-    expect(getPrototypeTurnProposals(1)).toHaveLength(2);
+    expect(getPrototypeTurnProposals(1)).toHaveLength(3);
   });
 
   it("ne propose que des types disponibles", () => {
@@ -17,6 +17,6 @@ describe("getPrototypeTurnProposals", () => {
   });
 
   it("cycle lorsque les séries sont épuisées", () => {
-    expect(getPrototypeTurnProposals(3)).toEqual(getPrototypeTurnProposals(1));
+    expect(getPrototypeTurnProposals(4)).toEqual(getPrototypeTurnProposals(1));
   });
 });

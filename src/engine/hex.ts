@@ -8,6 +8,21 @@ export interface HexCoordinate {
   r: number;
 }
 
+export const HEX_SIDES = [0, 1, 2, 3, 4, 5] as const;
+
+export type HexSide = (typeof HEX_SIDES)[number];
+
+export type HexRotation = HexSide;
+
+const HEX_NEIGHBOR_OFFSETS = [
+  { q: 1, r: 0 },
+  { q: 1, r: -1 },
+  { q: 0, r: -1 },
+  { q: -1, r: 0 },
+  { q: -1, r: 1 },
+  { q: 0, r: 1 },
+] as const satisfies readonly HexCoordinate[];
+
 /**
  * Calcule les six sommets d'un hexagone ayant une pointe en haut.
  */
@@ -97,4 +112,43 @@ export function getHexCoordinatesInRadius(radius: number): HexCoordinate[] {
   }
 
   return coordinates;
+}
+
+export function getHexNeighbor(
+  coordinate: HexCoordinate,
+  side: HexSide,
+): HexCoordinate {
+  const offset = HEX_NEIGHBOR_OFFSETS[side];
+
+  return {
+    q: coordinate.q + offset.q,
+    r: coordinate.r + offset.r,
+  };
+}
+
+export function getHexSideBetween(
+  origin: HexCoordinate,
+  neighbor: HexCoordinate,
+): HexSide | null {
+  for (const side of HEX_SIDES) {
+    const coordinate = getHexNeighbor(origin, side);
+
+    if (coordinate.q === neighbor.q && coordinate.r === neighbor.r) {
+      return side;
+    }
+  }
+
+  return null;
+}
+
+export function getOppositeHexSide(side: HexSide): HexSide {
+  return ((side + 3) % 6) as HexSide;
+}
+
+export function rotateHexSide(side: HexSide, rotation: HexRotation): HexSide {
+  return ((side + rotation) % 6) as HexSide;
+}
+
+export function getNextHexRotation(rotation: HexRotation): HexRotation {
+  return ((rotation + 1) % 6) as HexRotation;
 }

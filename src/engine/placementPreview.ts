@@ -18,6 +18,8 @@ import {
   type TerritoryAdjacencySynergyDefinition,
 } from "./synergies";
 import type { TerritoryUpgradeDefinitions } from "./upgrades";
+import type { TerritoryConnectionDefinitions } from "./connections";
+import type { HexRotation } from "./hex";
 
 export interface TerritoryPlacementPreview {
   valid: boolean;
@@ -34,8 +36,17 @@ export function previewTerritoryTilePlacement(
   resourceDefinitions: TerritoryResourceDefinitions,
   synergyDefinitions: readonly TerritoryAdjacencySynergyDefinition[],
   upgradeDefinitions: TerritoryUpgradeDefinitions = {},
+  rotation: HexRotation = 0,
+  connectionDefinitions: TerritoryConnectionDefinitions = {},
 ): TerritoryPlacementPreview {
-  const nextState = placeTerritoryTile(cells, state, cellId, tileTypeId);
+  const nextState = placeTerritoryTile(
+    cells,
+    state,
+    cellId,
+    tileTypeId,
+    rotation,
+    connectionDefinitions,
+  );
 
   if (nextState === state) {
     return {

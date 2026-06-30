@@ -222,3 +222,20 @@ h2 {
   color: #637066;
   font-size: 0.72rem;
 }
+
+.rotation-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 12px;
+  border-left: 1px solid #cad4cb;
+}
+
+.rotation-panel > strong {
+  color: #31583a;
+  font-size: 0.78rem;
+}
+
+.rotation-panel .build-button {
+  min-width: 145px;
+}

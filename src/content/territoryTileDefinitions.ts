@@ -16,6 +16,7 @@ export interface TerritoryTileDefinition {
 export const PROTOTYPE_PLACEABLE_TILE_TYPE_IDS = [
   "prairie",
   "forest",
+  "river",
 ] as const satisfies readonly PlaceableTerritoryTileTypeId[];
 
 export type PrototypePlaceableTileTypeId =
@@ -59,6 +60,19 @@ export const TERRITORY_TILE_DEFINITIONS: Partial<
       food: 0,
       energy: 0,
       nature: 4,
+      happiness: 1,
+    },
+  },
+
+  river: {
+    label: "Rivière",
+    fillColor: 0x78bfd2,
+    hoverColor: 0xa1dbe5,
+    strokeColor: 0x2e7185,
+    baseResources: {
+      food: 0,
+      energy: 0,
+      nature: 3,
       happiness: 1,
     },
   },

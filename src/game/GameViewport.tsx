@@ -12,9 +12,11 @@ import {
   TERRITORY_UPGRADE_APPLIED_EVENT,
   type SelectedUpgradeTypeId,
   type TerritoryUpgradeAppliedPayload,
+  SET_SELECTED_TILE_ROTATION_EVENT,
 } from "./gameEvents";
 
 import { createPhaserGame } from "./createPhaserGame";
+import type { HexRotation } from "../engine/hex";
 
 interface GameViewportProps {
   selectedTileTypeId: SelectedTileTypeId;
@@ -23,6 +25,7 @@ interface GameViewportProps {
   selectedUpgradeTypeId: SelectedUpgradeTypeId;
   improvementEnabled: boolean;
   onUpgradeApplied: (payload: TerritoryUpgradeAppliedPayload) => void;
+  selectedTileRotation: HexRotation;
 }
 
 /**
@@ -35,6 +38,7 @@ export function GameViewport({
   selectedUpgradeTypeId,
   improvementEnabled,
   onUpgradeApplied,
+  selectedTileRotation,
 }: GameViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
@@ -70,9 +74,9 @@ export function GameViewport({
 
     return () => {
       game.events.off(TERRITORY_TILE_PLACED_EVENT, handleTilePlaced);
+      game.events.off(TERRITORY_UPGRADE_APPLIED_EVENT, handleUpgradeApplied);
       game.destroy(true);
       gameRef.current = null;
-      game.events.off(TERRITORY_UPGRADE_APPLIED_EVENT, handleUpgradeApplied);
     };
   }, []);
 
@@ -123,6 +127,16 @@ export function GameViewport({
 
     game.events.emit(SET_IMPROVEMENT_ENABLED_EVENT, improvementEnabled);
   }, [improvementEnabled]);
+
+  useEffect(() => {
+    const game = gameRef.current;
+
+    if (game === null) {
+      return;
+    }
+
+    game.events.emit(SET_SELECTED_TILE_ROTATION_EVENT, selectedTileRotation);
+  }, [selectedTileRotation]);
 
   return (
     <div
