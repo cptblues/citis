@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import type Phaser from "phaser";
+
+import Phaser from "phaser";
 
 import type { HexRotation } from "../engine/hex";
 import { createPhaserGame } from "./createPhaserGame";
@@ -18,6 +19,21 @@ import {
   type TerritoryTilePlacedPayload,
   type TerritoryUpgradeAppliedPayload,
 } from "./gameEvents";
+import "./GameViewport.css";
+
+const TERRITORY_SCENE_KEY = "TerritoryPrototypeScene";
+
+const BOARD_FRAME = {
+  centerX: 480,
+  centerY: 350,
+  width: 820,
+  height: 540,
+} as const;
+
+const CAMERA_FIT_MARGIN = 0.94;
+const MIN_ZOOM_MULTIPLIER = 0.8;
+const MAX_ZOOM_MULTIPLIER = 2;
+const ZOOM_STEP = 0.15;
 
 interface GameViewportProps {
   selectedTileTypeId: SelectedTileTypeId;
@@ -30,8 +46,54 @@ interface GameViewportProps {
   onTerritorySummaryChanged: (payload: TerritorySummaryChangedPayload) => void;
 }
 
+function clampZoomMultiplier(value: number): number {
+  return Phaser.Math.Clamp(value, MIN_ZOOM_MULTIPLIER, MAX_ZOOM_MULTIPLIER);
+}
+
+function getTerritoryScene(game: Phaser.Game): Phaser.Scene | null {
+  if (!game.scene.isActive(TERRITORY_SCENE_KEY)) {
+    return null;
+  }
+
+  return game.scene.getScene(TERRITORY_SCENE_KEY);
+}
+
 /**
- * Monte la scène Phaser dans React et relaie les événements de gameplay.
+ * Les textes permanents de l'ancienne scène faisaient doublon avec le HUD
+ * React. Ils sont masqués une fois la scène créée. Les feedbacks temporaires
+ * générés plus tard après un placement restent visibles.
+ */
+function hideInitialSceneTexts(scene: Phaser.Scene): void {
+  for (const gameObject of scene.children.list) {
+    if (gameObject instanceof Phaser.GameObjects.Text) {
+      gameObject.setVisible(false);
+    }
+  }
+}
+
+function frameTerritoryCamera(game: Phaser.Game, zoomMultiplier: number): void {
+  const scene = getTerritoryScene(game);
+
+  if (scene === null) {
+    return;
+  }
+
+  const viewportWidth = Math.max(game.scale.gameSize.width, 1);
+  const viewportHeight = Math.max(game.scale.gameSize.height, 1);
+  const fitZoom =
+    Math.min(
+      viewportWidth / BOARD_FRAME.width,
+      viewportHeight / BOARD_FRAME.height,
+    ) * CAMERA_FIT_MARGIN;
+
+  scene.cameras.main
+    .setZoom(fitZoom * zoomMultiplier)
+    .centerOn(BOARD_FRAME.centerX, BOARD_FRAME.centerY);
+}
+
+/**
+ * Monte la scène Phaser dans React, relaie les événements de gameplay et
+ * fournit les contrôles de caméra de la carte.
  */
 export function GameViewport({
   selectedTileTypeId,
@@ -45,12 +107,14 @@ export function GameViewport({
 }: GameViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
+  const zoomMultiplierRef = useRef(1);
   const onTilePlacedRef = useRef(onTilePlaced);
   const onUpgradeAppliedRef = useRef(onUpgradeApplied);
   const onTerritorySummaryChangedRef = useRef(onTerritorySummaryChanged);
 
   useEffect(() => {
     const container = containerRef.current;
+
     if (container === null) {
       return;
     }
@@ -74,14 +138,65 @@ export function GameViewport({
       onTerritorySummaryChangedRef.current(payload);
     };
 
+    const handleWheel = (event: WheelEvent): void => {
+      event.preventDefault();
+
+      const direction = event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+      zoomMultiplierRef.current = clampZoomMultiplier(
+        zoomMultiplierRef.current + direction,
+      );
+      frameTerritoryCamera(game, zoomMultiplierRef.current);
+    };
+
+    let initializationFrame = 0;
+    let resizeFrame = 0;
+
+    const initializeSceneView = (): void => {
+      const scene = getTerritoryScene(game);
+
+      if (scene === null) {
+        initializationFrame = window.requestAnimationFrame(initializeSceneView);
+        return;
+      }
+
+      hideInitialSceneTexts(scene);
+      frameTerritoryCamera(game, zoomMultiplierRef.current);
+    };
+
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      if (entry === undefined) {
+        return;
+      }
+
+      const width = Math.floor(entry.contentRect.width);
+      const height = Math.floor(entry.contentRect.height);
+
+      if (width <= 0 || height <= 0) {
+        return;
+      }
+
+      game.scale.resize(width, height);
+      window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = window.requestAnimationFrame(() => {
+        frameTerritoryCamera(game, zoomMultiplierRef.current);
+      });
+    });
+
     game.events.on(TERRITORY_TILE_PLACED_EVENT, handleTilePlaced);
     game.events.on(TERRITORY_UPGRADE_APPLIED_EVENT, handleUpgradeApplied);
     game.events.on(
       TERRITORY_SUMMARY_CHANGED_EVENT,
       handleTerritorySummaryChanged,
     );
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    resizeObserver.observe(container);
+    initializationFrame = window.requestAnimationFrame(initializeSceneView);
 
     return () => {
+      window.cancelAnimationFrame(initializationFrame);
+      window.cancelAnimationFrame(resizeFrame);
+      resizeObserver.disconnect();
+      container.removeEventListener("wheel", handleWheel);
       game.events.off(TERRITORY_TILE_PLACED_EVENT, handleTilePlaced);
       game.events.off(TERRITORY_UPGRADE_APPLIED_EVENT, handleUpgradeApplied);
       game.events.off(
@@ -107,6 +222,7 @@ export function GameViewport({
 
   useEffect(() => {
     const game = gameRef.current;
+
     if (game === null) {
       return;
     }
@@ -116,6 +232,7 @@ export function GameViewport({
 
   useEffect(() => {
     const game = gameRef.current;
+
     if (game === null) {
       return;
     }
@@ -125,6 +242,7 @@ export function GameViewport({
 
   useEffect(() => {
     const game = gameRef.current;
+
     if (game === null) {
       return;
     }
@@ -134,6 +252,7 @@ export function GameViewport({
 
   useEffect(() => {
     const game = gameRef.current;
+
     if (game === null) {
       return;
     }
@@ -143,6 +262,7 @@ export function GameViewport({
 
   useEffect(() => {
     const game = gameRef.current;
+
     if (game === null) {
       return;
     }
@@ -150,5 +270,65 @@ export function GameViewport({
     game.events.emit(SET_SELECTED_TILE_ROTATION_EVENT, selectedTileRotation);
   }, [selectedTileRotation]);
 
-  return <div ref={containerRef} className="game-viewport" />;
+  function changeZoom(delta: number): void {
+    zoomMultiplierRef.current = clampZoomMultiplier(
+      zoomMultiplierRef.current + delta,
+    );
+
+    const game = gameRef.current;
+
+    if (game !== null) {
+      frameTerritoryCamera(game, zoomMultiplierRef.current);
+    }
+  }
+
+  function resetZoom(): void {
+    zoomMultiplierRef.current = 1;
+
+    const game = gameRef.current;
+
+    if (game !== null) {
+      frameTerritoryCamera(game, zoomMultiplierRef.current);
+    }
+  }
+
+  return (
+    <div className="game-viewport game-viewport-shell">
+      <div ref={containerRef} className="game-viewport__canvas" />
+
+      <div
+        className="map-zoom-controls"
+        role="group"
+        aria-label="Zoom de la carte"
+      >
+        <button
+          type="button"
+          className="map-zoom-button"
+          onClick={() => changeZoom(-ZOOM_STEP)}
+          aria-label="Dézoomer"
+          title="Dézoomer"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          className="map-zoom-button map-zoom-button--reset"
+          onClick={resetZoom}
+          aria-label="Recentrer la carte"
+          title="Recentrer la carte"
+        >
+          ◎
+        </button>
+        <button
+          type="button"
+          className="map-zoom-button"
+          onClick={() => changeZoom(ZOOM_STEP)}
+          aria-label="Zoomer"
+          title="Zoomer"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
 }

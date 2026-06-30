@@ -1,0 +1,102 @@
+.game-viewport.game-viewport-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  aspect-ratio: auto;
+  background:
+    radial-gradient(circle at 50% 45%, rgb(255 255 255 / 34%), transparent 48%),
+    #dfe8dd;
+  isolation: isolate;
+}
+
+.game-viewport__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.game-viewport__canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  outline: 0;
+}
+
+.map-zoom-controls {
+  position: absolute;
+  right: clamp(12px, 1.4vw, 20px);
+  bottom: clamp(12px, 1.4vw, 20px);
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(3, 42px);
+  gap: 5px;
+  padding: 5px;
+  border: 1px solid rgb(40 72 49 / 18%);
+  border-radius: 14px;
+  background: rgb(255 253 247 / 92%);
+  box-shadow: 0 12px 30px rgb(24 53 31 / 18%);
+  backdrop-filter: blur(10px);
+}
+
+.map-zoom-button {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  color: #18351f;
+  background: transparent;
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+
+.map-zoom-button:hover {
+  color: #fffdf7;
+  background: #31583a;
+  transform: translateY(-1px);
+}
+
+.map-zoom-button:active {
+  transform: translateY(0);
+}
+
+.map-zoom-button--reset {
+  color: #4f6f55;
+  background: #e4eee0;
+}
+
+.map-zoom-button:focus-visible {
+  outline: 3px solid rgb(76 116 82 / 34%);
+  outline-offset: 1px;
+}
+
+@media (max-width: 760px) {
+  .game-viewport.game-viewport-shell {
+    min-height: min(62svh, 520px);
+  }
+
+  .map-zoom-controls {
+    grid-template-columns: repeat(3, 38px);
+  }
+
+  .map-zoom-button {
+    width: 38px;
+    height: 38px;
+  }
+}
