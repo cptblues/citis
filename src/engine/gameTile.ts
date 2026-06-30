@@ -7,6 +7,9 @@ export interface GameTile {
   terrainTypeId: TerrainTypeId;
 }
 
+/**
+ * Produit l'identifiant stable d'une tuile terrain depuis ses coordonnées.
+ */
 export function createTileId(q: number, r: number): string {
   const normalizedQ = q === 0 ? 0 : q;
   const normalizedR = r === 0 ? 0 : r;

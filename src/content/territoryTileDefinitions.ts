@@ -43,6 +43,9 @@ const TERRITORY_TILE_DEFINITIONS: Partial<
   },
 };
 
+/**
+ * Retourne la définition visuelle d'une tuile de territoire connue du prototype.
+ */
 export function getTerritoryTileDefinition(
   tileTypeId: TerritoryTileTypeId,
 ): TerritoryTileDefinition {

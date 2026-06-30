@@ -29,6 +29,9 @@ export const TERRAIN_DEFINITIONS = {
   },
 } satisfies Record<TerrainTypeId, TerrainDefinition>;
 
+/**
+ * Retourne les libellés et couleurs associés à un type de terrain.
+ */
 export function getTerrainDefinition(
   terrainTypeId: TerrainTypeId,
 ): TerrainDefinition {

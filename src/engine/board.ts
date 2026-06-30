@@ -29,6 +29,9 @@ export interface BoardState {
   placedTiles: PlacedTerritoryTile[];
 }
 
+/**
+ * Produit l'identifiant stable d'une case du plateau depuis ses coordonnées.
+ */
 export function createBoardCellId(q: number, r: number): string {
   const normalizedQ = q === 0 ? 0 : q;
   const normalizedR = r === 0 ? 0 : r;
@@ -36,6 +39,9 @@ export function createBoardCellId(q: number, r: number): string {
   return `cell:${normalizedQ}:${normalizedR}`;
 }
 
+/**
+ * Démarre le plateau avec le bourg central déjà posé.
+ */
 export function createInitialBoardState(): BoardState {
   return {
     placedTiles: [
@@ -51,6 +57,9 @@ export function createInitialBoardState(): BoardState {
   };
 }
 
+/**
+ * Retrouve la tuile de territoire occupant une coordonnée donnée.
+ */
 export function getPlacedTileAt(
   state: BoardState,
   coordinate: HexCoordinate,
@@ -60,6 +69,9 @@ export function getPlacedTileAt(
   );
 }
 
+/**
+ * Liste les cases libres adjacentes à au moins une tuile déjà posée.
+ */
 export function getAvailablePlacementCells(
   cells: readonly BoardCell[],
   state: BoardState,
@@ -77,6 +89,9 @@ export function getAvailablePlacementCells(
   });
 }
 
+/**
+ * Place une tuile de territoire si la case existe et respecte les règles.
+ */
 export function placeTerritoryTile(
   cells: readonly BoardCell[],
   state: BoardState,

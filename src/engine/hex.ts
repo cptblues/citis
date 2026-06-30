@@ -32,11 +32,17 @@ export function getHexCorners(
 }
 
 const PhaserMath = {
+  /**
+   * Convertit un angle en radians sans dépendre de Phaser dans le moteur pur.
+   */
   degreesToRadians(degrees: number): number {
     return (degrees * Math.PI) / 180;
   },
 };
 
+/**
+ * Convertit une coordonnée axiale en position pixel pour une grille pointy-top.
+ */
 export function axialToPixel(
   coordinate: HexCoordinate,
   size: number,
@@ -47,6 +53,9 @@ export function axialToPixel(
   };
 }
 
+/**
+ * Mesure la distance hexagonale minimale entre deux coordonnées axiales.
+ */
 export function getHexDistance(
   first: HexCoordinate,
   second: HexCoordinate,
@@ -58,6 +67,9 @@ export function getHexDistance(
   return (Math.abs(deltaQ) + Math.abs(deltaR) + Math.abs(deltaS)) / 2;
 }
 
+/**
+ * Filtre des éléments porteurs de coordonnées dans un rayon hexagonal donné.
+ */
 export function getItemsInHexRadius<T extends HexCoordinate>(
   items: readonly T[],
   center: HexCoordinate,
@@ -66,6 +78,9 @@ export function getItemsInHexRadius<T extends HexCoordinate>(
   return items.filter((item) => getHexDistance(center, item) <= radius);
 }
 
+/**
+ * Génère toutes les coordonnées axiales comprises dans un disque hexagonal.
+ */
 export function getHexCoordinatesInRadius(radius: number): HexCoordinate[] {
   const coordinates: HexCoordinate[] = [];
 

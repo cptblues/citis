@@ -26,12 +26,18 @@ export interface StructurePlacementRule {
   allowedTerrainTypeIds: readonly TerrainTypeId[];
 }
 
+/**
+ * Initialise l'état des structures sans construction placée.
+ */
 export function createInitialGameState(): GameState {
   return {
     structures: [],
   };
 }
 
+/**
+ * Valide qu'une structure peut être placée sur une tuile libre et compatible.
+ */
 export function canPlaceStructure(
   state: GameState,
   tile: GameTile,
@@ -48,6 +54,9 @@ export function canPlaceStructure(
   return !tileIsOccupied && terrainIsAllowed;
 }
 
+/**
+ * Applique un placement de structure de façon immuable si la tuile est libre.
+ */
 export function applyPlaceStructure(
   state: GameState,
   action: PlaceStructureAction,

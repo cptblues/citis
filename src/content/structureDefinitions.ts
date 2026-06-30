@@ -23,6 +23,9 @@ export const STRUCTURE_DEFINITIONS = {
   },
 } satisfies Record<StructureTypeId, StructureDefinition>;
 
+/**
+ * Retourne les règles, métriques et couleurs d'un type de structure.
+ */
 export function getStructureDefinition(
   structureTypeId: StructureTypeId,
 ): StructureDefinition {

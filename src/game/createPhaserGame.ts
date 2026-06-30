@@ -5,6 +5,9 @@ import { TerritoryPrototypeScene } from "./scenes/TerritoryPrototypeScene";
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 640;
 
+/**
+ * Crée l'instance Phaser attachée au conteneur fourni par React.
+ */
 export function createPhaserGame(parent: HTMLElement): Phaser.Game {
   return new Phaser.Game({
     type: Phaser.AUTO,

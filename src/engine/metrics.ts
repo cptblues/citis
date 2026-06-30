@@ -13,6 +13,9 @@ export type StructureMetricDefinitions = Record<
   StructureMetricDefinition
 >;
 
+/**
+ * Agrège les métriques globales dérivées des structures placées.
+ */
 export function calculateGlobalMetrics(
   state: GameState,
   definitions: StructureMetricDefinitions,

@@ -3,11 +3,26 @@ import { useState } from "react";
 
 import type { SelectedTileTypeId } from "../game/gameEvents";
 
+import { getPrototypeTurnProposals } from "../content/prototypeTurnProposals";
+import { getTerritoryTileDefinition } from "../content/territoryTileDefinitions";
+import {
+  createInitialTurnState,
+  endTurn,
+  markPlacementCompleted,
+} from "../engine/turn";
+
 import "./App.css";
 
+/**
+ * Compose l'interface React autour de la scène Phaser et de l'état de tour.
+ */
 export function App() {
   const [selectedTileTypeId, setSelectedTileTypeId] =
     useState<SelectedTileTypeId>(null);
+  const [turnState, setTurnState] = useState(createInitialTurnState);
+
+  const proposals = getPrototypeTurnProposals(turnState.number);
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -16,7 +31,7 @@ export function App() {
           <h1>Citis</h1>
         </div>
 
-        <p className="step-label">Migration 2 · Placement territorial</p>
+        <p className="step-label">Migration 3 · Boucle de tour</p>
       </header>
 
       <section className="game-card" aria-labelledby="game-title">
@@ -30,48 +45,70 @@ export function App() {
         </div>
 
         <div className="build-toolbar">
-          <button
-            type="button"
-            className={
-              selectedTileTypeId === "prairie"
-                ? "build-button build-button--active"
-                : "build-button"
-            }
-            aria-pressed={selectedTileTypeId === "prairie"}
-            onClick={() => {
-              setSelectedTileTypeId((currentTileTypeId) =>
-                currentTileTypeId === "prairie" ? null : "prairie",
+          <div className="turn-summary">
+            <strong>Tour {turnState.number}</strong>
+
+            <span>
+              {turnState.placementCompleted
+                ? "Placement terminé"
+                : "Choisis une proposition"}
+            </span>
+          </div>
+
+          <div className="proposal-list">
+            {proposals.map((tileTypeId, proposalIndex) => {
+              const definition = getTerritoryTileDefinition(tileTypeId);
+
+              const isSelected = selectedTileTypeId === tileTypeId;
+
+              return (
+                <button
+                  key={`${turnState.number}:${proposalIndex}:${tileTypeId}`}
+                  type="button"
+                  className={
+                    isSelected
+                      ? "build-button build-button--active"
+                      : "build-button"
+                  }
+                  aria-pressed={isSelected}
+                  disabled={turnState.placementCompleted}
+                  onClick={() => {
+                    setSelectedTileTypeId(isSelected ? null : tileTypeId);
+                  }}
+                >
+                  <small>Proposition {proposalIndex + 1}</small>
+
+                  <span>{definition.label}</span>
+                </button>
               );
-            }}
-          >
-            Prairie
-          </button>
+            })}
+          </div>
 
           <button
             type="button"
-            className={
-              selectedTileTypeId === "forest"
-                ? "build-button build-button--active"
-                : "build-button"
-            }
-            aria-pressed={selectedTileTypeId === "forest"}
+            className="end-turn-button"
+            disabled={!turnState.placementCompleted}
             onClick={() => {
-              setSelectedTileTypeId((currentTileTypeId) =>
-                currentTileTypeId === "forest" ? null : "forest",
-              );
+              setTurnState((currentState) => endTurn(currentState));
+
+              setSelectedTileTypeId(null);
             }}
           >
-            Forêt
+            Terminer le tour
           </button>
-
-          <span className="build-toolbar__status">
-            {selectedTileTypeId === null
-              ? "Choisis une tuile à placer"
-              : "Clique sur un emplacement disponible"}
-          </span>
         </div>
 
-        <GameViewport selectedTileTypeId={selectedTileTypeId} />
+        <GameViewport
+          selectedTileTypeId={selectedTileTypeId}
+          placementEnabled={!turnState.placementCompleted}
+          onTilePlaced={() => {
+            setTurnState((currentState) =>
+              markPlacementCompleted(currentState),
+            );
+
+            setSelectedTileTypeId(null);
+          }}
+        />
       </section>
     </main>
   );

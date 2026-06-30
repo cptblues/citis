@@ -46,6 +46,9 @@ const TILE_BUILD_INVALID_ALPHA = 0.35;
 const TILE_BUILD_VALID_STROKE_WIDTH = 4;
 const TILE_BUILD_HOVER_STROKE_WIDTH = 6;
 
+/**
+ * Ancienne scène de prototype pour tester les terrains, influences et structures.
+ */
 export class PrototypeScene extends Phaser.Scene {
   private selectedTileId: string | null = null;
   private hoveredTileId: string | null = null;
@@ -77,10 +80,16 @@ export class PrototypeScene extends Phaser.Scene {
 
   private populationText!: Phaser.GameObjects.Text;
 
+  /**
+   * Déclare la clé historique de cette scène Phaser.
+   */
   public constructor() {
     super({ key: "PrototypeScene" });
   }
 
+  /**
+   * Prépare les textes, métriques et abonnements nécessaires au prototype initial.
+   */
   public create(): void {
     this.cameras.main.setBackgroundColor("#dfe8dd");
 
@@ -122,8 +131,24 @@ export class PrototypeScene extends Phaser.Scene {
 
     this.refreshMetrics();
 
+    this.game.events.on(
+      SET_BUILD_MODE_EVENT,
+      this.handleBuildModeChanged,
+      this,
+    );
+
+    this.events.once(
+      Phaser.Scenes.Events.SHUTDOWN,
+      this.handleSceneShutdown,
+      this,
+    );
+
     this.drawHexGrid();
   }
+
+  /**
+   * Crée toutes les tuiles terrain du prototype initial.
+   */
   private drawHexGrid(): void {
     this.tileViews.clear();
 
@@ -155,6 +180,9 @@ export class PrototypeScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Crée la forme interactive d'une tuile terrain et ses réactions souris.
+   */
   private createInteractiveTile(
     tile: GameTile,
     corners: HexPoint[],
@@ -235,20 +263,11 @@ export class PrototypeScene extends Phaser.Scene {
         `Tuile : ${tile.q}, ${tile.r} · ${terrainDefinition.label} · Rayon : ${this.influencedTileIds.size}`,
       );
     });
-
-    this.game.events.on(
-      SET_BUILD_MODE_EVENT,
-      this.handleBuildModeChanged,
-      this,
-    );
-
-    this.events.once(
-      Phaser.Scenes.Events.SHUTDOWN,
-      this.handleSceneShutdown,
-      this,
-    );
   }
 
+  /**
+   * Synchronise le mode de construction reçu depuis l'interface React.
+   */
   private handleBuildModeChanged(buildMode: StructureTypeId | null): void {
     this.activeBuildMode = buildMode;
     this.hoveredTileId = null;
@@ -256,6 +275,9 @@ export class PrototypeScene extends Phaser.Scene {
     this.redrawAllTiles();
   }
 
+  /**
+   * Supprime les abonnements globaux de la scène à son arrêt.
+   */
   private handleSceneShutdown(): void {
     this.game.events.off(
       SET_BUILD_MODE_EVENT,
@@ -264,6 +286,9 @@ export class PrototypeScene extends Phaser.Scene {
     );
   }
 
+  /**
+   * Calcule les tuiles voisines mises en évidence autour d'une sélection.
+   */
   private updateInfluencedTiles(selectedTile: GameTile): void {
     this.influencedTileIds.clear();
 
@@ -284,12 +309,18 @@ export class PrototypeScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Rafraîchit l'état visuel de toutes les tuiles terrain.
+   */
   private redrawAllTiles(): void {
     for (const tileId of this.tileViews.keys()) {
       this.redrawTile(tileId);
     }
   }
 
+  /**
+   * Applique les couleurs d'une tuile selon sélection, influence et build mode.
+   */
   private redrawTile(tileId: string): void {
     const tileView = this.tileViews.get(tileId);
 
@@ -358,6 +389,9 @@ export class PrototypeScene extends Phaser.Scene {
     tileView.graphics.strokePoints(tileView.corners, true);
   }
 
+  /**
+   * Tente de construire une structure et déclenche les retours visuels associés.
+   */
   private tryPlaceStructure(
     tile: GameTile,
     structureTypeId: StructureTypeId,
@@ -414,6 +448,9 @@ export class PrototypeScene extends Phaser.Scene {
     return true;
   }
 
+  /**
+   * Dessine ou remplace la vue Phaser d'une structure placée.
+   */
   private drawStructure(structure: PlacedStructure): void {
     const tileView = this.tileViews.get(structure.tileId);
 
@@ -437,10 +474,11 @@ export class PrototypeScene extends Phaser.Scene {
     this.structureViews.set(structure.id, container);
 
     container.setDepth(10);
-
-    this.structureViews.set(structure.id, container);
   }
 
+  /**
+   * Vérifie une règle de placement en utilisant la définition de la structure.
+   */
   private canPlaceOnTile(
     tile: GameTile,
     structureTypeId: StructureTypeId,
@@ -452,6 +490,9 @@ export class PrototypeScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Affiche une prévisualisation semi-transparente de la structure.
+   */
   private showGhostStructure(
     tile: GameTile,
     structureTypeId: StructureTypeId,
@@ -474,6 +515,9 @@ export class PrototypeScene extends Phaser.Scene {
     this.ghostStructureView.setDepth(30);
   }
 
+  /**
+   * Retire la prévisualisation de structure si elle existe.
+   */
   private clearGhostStructure(): void {
     if (this.ghostStructureView === null) {
       return;
@@ -483,6 +527,9 @@ export class PrototypeScene extends Phaser.Scene {
     this.ghostStructureView = null;
   }
 
+  /**
+   * Construit le groupe graphique représentant une structure.
+   */
   private createStructureView(
     structureTypeId: StructureTypeId,
     centerX: number,
@@ -514,6 +561,9 @@ export class PrototypeScene extends Phaser.Scene {
     return container;
   }
 
+  /**
+   * Recalcule et affiche les métriques globales de population.
+   */
   private refreshMetrics(): void {
     const metrics = calculateGlobalMetrics(
       this.gameState,
@@ -525,6 +575,9 @@ export class PrototypeScene extends Phaser.Scene {
     );
   }
 
+  /**
+   * Affiche une animation courte pour le gain de capacité de population.
+   */
   private showPopulationCapacityDelta(tileId: string, amount: number): void {
     if (amount <= 0) {
       return;

@@ -15,6 +15,8 @@ import { getTerritoryTileDefinition } from "../../content/territoryTileDefinitio
 import {
   SET_SELECTED_TILE_TYPE_EVENT,
   type SelectedTileTypeId,
+  SET_PLACEMENT_ENABLED_EVENT,
+  TERRITORY_TILE_PLACED_EVENT,
 } from "../gameEvents";
 
 const MAP_CENTER_X = 480;
@@ -39,6 +41,9 @@ interface CellView {
   centerY: number;
 }
 
+/**
+ * Scène active du prototype: placement de tuiles de territoire tour par tour.
+ */
 export class TerritoryPrototypeScene extends Phaser.Scene {
   private boardState: BoardState = createInitialBoardState();
 
@@ -57,16 +62,24 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     Phaser.GameObjects.Container
   >();
 
+  private placementEnabled = true;
+
+  /**
+   * Déclare la clé de scène utilisée par la configuration Phaser.
+   */
   public constructor() {
     super({
       key: "TerritoryPrototypeScene",
     });
   }
 
+  /**
+   * Prépare l'interface Phaser, les ponts d'événements React et le plateau.
+   */
   public create(): void {
     this.cameras.main.setBackgroundColor("#dfe8dd");
 
-    this.add.text(32, 28, "Premières tuiles territoriales", {
+    this.add.text(32, 28, "Première boucle de tour", {
       color: "#18351f",
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize: "28px",
@@ -76,7 +89,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.add.text(
       32,
       70,
-      "Choisis une Prairie ou une Forêt, puis agrandis la commune.",
+      "Choisis une proposition, pose-la, puis termine le tour.",
       {
         color: "#4f5e51",
         fontFamily: "Inter, system-ui, sans-serif",
@@ -99,6 +112,12 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       this,
     );
 
+    this.game.events.on(
+      SET_PLACEMENT_ENABLED_EVENT,
+      this.handlePlacementEnabledChanged,
+      this,
+    );
+
     this.events.once(
       Phaser.Scenes.Events.SHUTDOWN,
       this.handleSceneShutdown,
@@ -108,6 +127,9 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.drawBoard();
   }
 
+  /**
+   * Recalcule les cases libres adjacentes au territoire déjà posé.
+   */
   private refreshAvailableCells(): void {
     this.availableCellIds = new Set(
       getAvailablePlacementCells(prototypeBoardCells, this.boardState).map(
@@ -116,6 +138,9 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     );
   }
 
+  /**
+   * Instancie les vues de chaque case du plateau puis dessine le bourg.
+   */
   private drawBoard(): void {
     this.refreshAvailableCells();
 
@@ -134,6 +159,9 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.drawTown();
   }
 
+  /**
+   * Crée l'objet graphique interactif d'une case et ses réactions souris.
+   */
   private createCellView(
     cell: BoardCell,
     corners: HexPoint[],
@@ -173,6 +201,14 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
         return;
       }
 
+      if (!this.placementEnabled) {
+        this.statusText.setText(
+          "Termine le tour avant de poser une autre tuile",
+        );
+
+        return;
+      }
+
       if (this.selectedTileTypeId === null) {
         this.statusText.setText("Choisis d’abord Prairie ou Forêt");
 
@@ -181,11 +217,13 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
 
       const previousTileCount = this.boardState.placedTiles.length;
 
+      const selectedTileTypeId = this.selectedTileTypeId;
+
       this.boardState = placeTerritoryTile(
         prototypeBoardCells,
         this.boardState,
         cell.id,
-        this.selectedTileTypeId,
+        selectedTileTypeId,
       );
 
       if (this.boardState.placedTiles.length === previousTileCount) {
@@ -199,14 +237,21 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       }
 
       this.drawPlacedTileContent(placedTile);
+
+      this.placementEnabled = false;
+      this.selectedTileTypeId = null;
+
+      this.game.events.emit(TERRITORY_TILE_PLACED_EVENT, {
+        cellId: cell.id,
+        tileTypeId: selectedTileTypeId,
+      });
+
       this.refreshAvailableCells();
       this.redrawAllCells();
 
       const definition = getTerritoryTileDefinition(placedTile.typeId);
 
-      this.statusText.setText(
-        `${definition.label} posée · ${this.availableCellIds.size} emplacements disponibles`,
-      );
+      this.statusText.setText(`${definition.label} posée · termine le tour`);
     });
 
     this.redrawCell(cell.id);
@@ -221,12 +266,18 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       .setDepth(20);
   }
 
+  /**
+   * Rafraîchit l'état visuel de toutes les cases connues de la scène.
+   */
   private redrawAllCells(): void {
     for (const cellId of this.cellViews.keys()) {
       this.redrawCell(cellId);
     }
   }
 
+  /**
+   * Applique les couleurs d'une case selon occupation, disponibilité et survol.
+   */
   private redrawCell(cellId: string): void {
     const cellView = this.cellViews.get(cellId);
 
@@ -253,7 +304,7 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       strokeColor = definition.strokeColor;
       strokeWidth = 3;
     } else if (isAvailable) {
-      if (this.selectedTileTypeId !== null) {
+      if (this.placementEnabled && this.selectedTileTypeId !== null) {
         const selectedDefinition = getTerritoryTileDefinition(
           this.selectedTileTypeId,
         );
@@ -289,6 +340,9 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     cellView.graphics.strokePoints(cellView.corners, true);
   }
 
+  /**
+   * Dessine le contenu décoratif fixe de la tuile de départ.
+   */
   private drawTown(): void {
     const townCell = this.cellViews.get("cell:0:0");
 
@@ -336,9 +390,17 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       .setDepth(20);
   }
 
+  /**
+   * Synchronise la sélection React avec l'état interne de la scène.
+   */
   private handleSelectedTileTypeChanged(tileTypeId: SelectedTileTypeId): void {
     this.selectedTileTypeId = tileTypeId;
     this.hoveredCellId = null;
+
+    if (!this.placementEnabled) {
+      this.selectedTileTypeId = null;
+      return;
+    }
 
     if (tileTypeId === null) {
       this.statusText.setText(
@@ -353,14 +415,25 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     this.redrawAllCells();
   }
 
+  /**
+   * Nettoie les abonnements globaux lorsque Phaser arrête la scène.
+   */
   private handleSceneShutdown(): void {
     this.game.events.off(
       SET_SELECTED_TILE_TYPE_EVENT,
       this.handleSelectedTileTypeChanged,
       this,
     );
+    this.game.events.off(
+      SET_PLACEMENT_ENABLED_EVENT,
+      this.handlePlacementEnabledChanged,
+      this,
+    );
   }
 
+  /**
+   * Ajoute le décor spécifique d'une tuile de territoire déjà validée.
+   */
   private drawPlacedTileContent(tile: PlacedTerritoryTile): void {
     if (tile.typeId === "town" || this.placedTileContentViews.has(tile.id)) {
       return;
@@ -414,5 +487,24 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
     container.setDepth(10);
 
     this.placedTileContentViews.set(tile.id, container);
+  }
+
+  /**
+   * Active ou suspend le placement selon l'état du tour contrôlé par React.
+   */
+  private handlePlacementEnabledChanged(placementEnabled: boolean): void {
+    this.placementEnabled = placementEnabled;
+
+    if (placementEnabled) {
+      this.statusText.setText(
+        `Nouveau tour · ${this.availableCellIds.size} emplacements disponibles`,
+      );
+    } else {
+      this.selectedTileTypeId = null;
+
+      this.statusText.setText("Tuile posée · termine le tour");
+    }
+
+    this.redrawAllCells();
   }
 }
