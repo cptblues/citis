@@ -36,6 +36,14 @@ export interface TerritoryUpgradeAppliedPayload {
 export const SET_SELECTED_TILE_ROTATION_EVENT =
   "citis:set-selected-tile-rotation";
 
+/** État visuel du bourg transmis par React au rendu Phaser. */
+export const SET_SETTLEMENT_LEVEL_EVENT = "citis:set-settlement-level";
+export interface SettlementLevelChangedPayload {
+  id: string;
+  label: string;
+  levelIndex: number;
+}
+
 /** Commandes React vers la caméra interne du territoire. */
 export const TERRITORY_MAP_ZOOM_IN_EVENT = "citis:territory-map-zoom-in";
 export const TERRITORY_MAP_ZOOM_OUT_EVENT = "citis:territory-map-zoom-out";

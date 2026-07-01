@@ -6,6 +6,10 @@ import {
   type TerritoryTileDefinition,
 } from "../../content/territoryTileDefinitions";
 import type { PlacedTerritoryTile } from "../../engine/board";
+import {
+  SET_SETTLEMENT_LEVEL_EVENT,
+  type SettlementLevelChangedPayload,
+} from "../gameEvents";
 
 interface TerritoryTileRendererContext {
   scene: Phaser.Scene;
@@ -36,20 +40,13 @@ export function createTerritoryTileContent(
   const container = scene.add.container(centerX, centerY);
   const renderer = TERRITORY_TILE_RENDERERS[definition.renderer];
 
-  renderer({
-    scene,
-    container,
-    tile,
-    definition,
-  });
-
+  renderer({ scene, container, tile, definition });
   container.setDepth(10);
+
   return container;
 }
 
-/**
- * Compatibilité avec les anciens appels du prototype.
- */
+/** Compatibilité avec les anciens appels du prototype. */
 export function createTownContent(
   scene: Phaser.Scene,
   centerX: number,
@@ -77,21 +74,185 @@ function renderTown({
 }: TerritoryTileRendererContext): void {
   container.y -= 5;
 
-  const mainBuilding = scene.add.rectangle(0, 7, 34, 26, 0xf1e1bd);
-  const roof = scene.add.graphics();
-  roof.fillStyle(0xb85f45, 1);
-  roof.beginPath();
-  roof.moveTo(-21, -3);
-  roof.lineTo(0, -23);
-  roof.lineTo(21, -3);
-  roof.closePath();
-  roof.fillPath();
+  const visual = scene.add.container(0, 0);
+  container.add(visual);
 
+  let currentLevel: SettlementLevelChangedPayload = {
+    id: "village",
+    label: definition.label,
+    levelIndex: 0,
+  };
+
+  const drawCurrentLevel = (): void => {
+    visual.removeAll(true);
+
+    if (currentLevel.levelIndex >= 2) {
+      drawMetropolitanHeart(scene, visual, currentLevel.label);
+      return;
+    }
+
+    if (currentLevel.levelIndex >= 1) {
+      drawCommunalCenter(scene, visual, currentLevel.label);
+      return;
+    }
+
+    drawVillage(scene, visual, currentLevel.label);
+  };
+
+  const handleSettlementLevelChanged = (
+    nextLevel: SettlementLevelChangedPayload,
+  ): void => {
+    if (nextLevel.id === currentLevel.id) {
+      return;
+    }
+
+    currentLevel = nextLevel;
+    drawCurrentLevel();
+    visual.setAlpha(0).setScale(0.72);
+
+    const halo = scene.add.circle(0, 3, 29, 0xf6d98a, 0.5);
+    container.addAt(halo, 0);
+
+    scene.tweens.add({
+      targets: visual,
+      alpha: 1,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 420,
+      ease: "Back.Out",
+    });
+    scene.tweens.add({
+      targets: halo,
+      alpha: 0,
+      scaleX: 1.75,
+      scaleY: 1.75,
+      duration: 700,
+      ease: "Sine.Out",
+      onComplete: () => halo.destroy(),
+    });
+  };
+
+  scene.game.events.on(
+    SET_SETTLEMENT_LEVEL_EVENT,
+    handleSettlementLevelChanged,
+  );
+  container.once("destroy", () => {
+    scene.game.events.off(
+      SET_SETTLEMENT_LEVEL_EVENT,
+      handleSettlementLevelChanged,
+    );
+  });
+
+  drawCurrentLevel();
+}
+
+function drawVillage(
+  scene: Phaser.Scene,
+  container: Phaser.GameObjects.Container,
+  labelText: string,
+): void {
+  const mainBuilding = scene.add.rectangle(0, 7, 34, 26, 0xf1e1bd);
+  const roof = createRoof(scene, 0, -3, 21, 20, 0xb85f45);
   const door = scene.add.rectangle(0, 13, 8, 14, 0x6c4835);
   const leftHouse = scene.add.rectangle(-24, 12, 15, 17, 0xf5e6c8);
   const rightHouse = scene.add.rectangle(24, 12, 15, 17, 0xf5e6c8);
-  const label = scene.add
-    .text(0, -41, definition.label, {
+  const label = createTownLabel(scene, labelText, -41);
+
+  container.add([mainBuilding, roof, door, leftHouse, rightHouse, label]);
+}
+
+function drawCommunalCenter(
+  scene: Phaser.Scene,
+  container: Phaser.GameObjects.Container,
+  labelText: string,
+): void {
+  const plaza = scene.add.ellipse(0, 25, 64, 18, 0xd8cda9, 0.9);
+  const mainBuilding = scene.add.rectangle(0, 5, 42, 31, 0xf1dfb8);
+  const roof = createRoof(scene, 0, -6, 25, 22, 0xae563f);
+  const door = scene.add.rectangle(0, 12, 9, 17, 0x684733);
+  const leftHouse = scene.add.rectangle(-30, 13, 18, 21, 0xf5e8cc);
+  const rightHouse = scene.add.rectangle(30, 13, 18, 21, 0xf5e8cc);
+  const treeTrunk = scene.add.rectangle(-39, 18, 4, 12, 0x70503a);
+  const treeCrown = scene.add.circle(-39, 8, 10, 0x4f7d50);
+  const fountain = scene.add.circle(0, 25, 5, 0x65a6b9);
+  const label = createTownLabel(scene, labelText, -46);
+
+  container.add([
+    plaza,
+    mainBuilding,
+    roof,
+    door,
+    leftHouse,
+    rightHouse,
+    treeTrunk,
+    treeCrown,
+    fountain,
+    label,
+  ]);
+}
+
+function drawMetropolitanHeart(
+  scene: Phaser.Scene,
+  container: Phaser.GameObjects.Container,
+  labelText: string,
+): void {
+  const plaza = scene.add.ellipse(0, 26, 72, 20, 0xd6c79d, 0.95);
+  const leftWing = scene.add.rectangle(-22, 10, 25, 31, 0xead7ae);
+  const rightWing = scene.add.rectangle(22, 10, 25, 31, 0xead7ae);
+  const center = scene.add.rectangle(0, 2, 28, 43, 0xf1dfb8);
+  const roof = createRoof(scene, 0, -20, 18, 14, 0x9e4c3a);
+  const tower = scene.add.rectangle(0, -22, 12, 20, 0xe7d2a7);
+  const towerRoof = createRoof(scene, 0, -34, 9, 10, 0x8e4434);
+  const clock = scene.add.circle(0, -23, 4, 0xfff4d3);
+  const door = scene.add.rectangle(0, 14, 9, 17, 0x624331);
+  const leftTree = createTree(scene, -42, 10);
+  const rightTree = createTree(scene, 42, 10);
+  const fountain = scene.add.circle(0, 27, 6, 0x5d9eb4);
+  const label = createTownLabel(scene, labelText, -55);
+
+  container.add([
+    plaza,
+    leftWing,
+    rightWing,
+    center,
+    roof,
+    tower,
+    towerRoof,
+    clock,
+    door,
+    ...leftTree,
+    ...rightTree,
+    fountain,
+    label,
+  ]);
+}
+
+function createRoof(
+  scene: Phaser.Scene,
+  centerX: number,
+  baseY: number,
+  halfWidth: number,
+  height: number,
+  color: number,
+): Phaser.GameObjects.Graphics {
+  const roof = scene.add.graphics();
+  roof.fillStyle(color, 1);
+  roof.beginPath();
+  roof.moveTo(centerX - halfWidth, baseY);
+  roof.lineTo(centerX, baseY - height);
+  roof.lineTo(centerX + halfWidth, baseY);
+  roof.closePath();
+  roof.fillPath();
+  return roof;
+}
+
+function createTownLabel(
+  scene: Phaser.Scene,
+  text: string,
+  y: number,
+): Phaser.GameObjects.Text {
+  return scene.add
+    .text(0, y, text, {
       color: "#18351f",
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize: "14px",
@@ -99,9 +260,19 @@ function renderTown({
       stroke: "#fffdf7",
       strokeThickness: 4,
     })
-    .setOrigin(0.5);
+    .setOrigin(0.5)
+    .setVisible(false);
+}
 
-  container.add([mainBuilding, roof, door, leftHouse, rightHouse, label]);
+function createTree(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+): Phaser.GameObjects.GameObject[] {
+  return [
+    scene.add.rectangle(x, y + 9, 4, 13, 0x70503a),
+    scene.add.circle(x, y, 10, 0x4f7d50),
+  ];
 }
 
 function renderPrairie({
@@ -224,15 +395,7 @@ function renderFarm({ scene, container }: TerritoryTileRendererContext): void {
   container.y -= 2;
 
   const barn = scene.add.rectangle(0, 9, 34, 29, 0xc8674e);
-  const barnRoof = scene.add.graphics();
-  barnRoof.fillStyle(0x7d4536, 1);
-  barnRoof.beginPath();
-  barnRoof.moveTo(-21, -4);
-  barnRoof.lineTo(0, -23);
-  barnRoof.lineTo(21, -4);
-  barnRoof.closePath();
-  barnRoof.fillPath();
-
+  const barnRoof = createRoof(scene, 0, -4, 21, 19, 0x7d4536);
   const barnDoor = scene.add.rectangle(0, 13, 13, 20, 0x7a4d37);
   const doorCross = scene.add.graphics();
   doorCross.lineStyle(2, 0xd9ad7b, 1);

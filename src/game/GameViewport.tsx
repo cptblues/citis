@@ -8,6 +8,7 @@ import {
   SET_SELECTED_TILE_ROTATION_EVENT,
   SET_SELECTED_TILE_TYPE_EVENT,
   SET_SELECTED_UPGRADE_TYPE_EVENT,
+  SET_SETTLEMENT_LEVEL_EVENT,
   TERRITORY_MAP_FIT_EVENT,
   TERRITORY_MAP_ZOOM_IN_EVENT,
   TERRITORY_MAP_ZOOM_OUT_EVENT,
@@ -17,6 +18,7 @@ import {
   TERRITORY_UPGRADE_APPLIED_EVENT,
   type SelectedTileTypeId,
   type SelectedUpgradeTypeId,
+  type SettlementLevelChangedPayload,
   type TerritoryPlacementPreviewChangedPayload,
   type TerritorySummaryChangedPayload,
   type TerritoryTilePlacedPayload,
@@ -38,6 +40,7 @@ interface GameViewportProps {
   onPlacementPreviewChanged: (
     payload: TerritoryPlacementPreviewChangedPayload,
   ) => void;
+  settlementLevel: SettlementLevelChangedPayload;
 }
 
 function getTerritoryScene(game: Phaser.Game): Phaser.Scene | null {
@@ -79,6 +82,7 @@ export function GameViewport({
   selectedTileRotation,
   onTerritorySummaryChanged,
   onPlacementPreviewChanged,
+  settlementLevel,
 }: GameViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
@@ -241,6 +245,16 @@ export function GameViewport({
 
     game.events.emit(SET_SELECTED_TILE_ROTATION_EVENT, selectedTileRotation);
   }, [selectedTileRotation]);
+
+  useEffect(() => {
+    const game = gameRef.current;
+
+    if (game === null) {
+      return;
+    }
+
+    game.events.emit(SET_SETTLEMENT_LEVEL_EVENT, settlementLevel);
+  }, [settlementLevel.id, settlementLevel.label, settlementLevel.levelIndex]);
 
   function emitMapControl(eventName: string): void {
     gameRef.current?.events.emit(eventName);

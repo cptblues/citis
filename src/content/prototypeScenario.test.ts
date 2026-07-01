@@ -36,6 +36,39 @@ describe("PROTOTYPE_SCENARIO", () => {
     });
   });
 
+  it("définit trois niveaux d’évolution du bourg", () => {
+    expect(PROTOTYPE_SCENARIO.settlementProgression.levels).toHaveLength(3);
+    expect(PROTOTYPE_SCENARIO.settlementProgression.levels[0]).toMatchObject({
+      id: "village",
+      label: "Bourg",
+      requirements: null,
+    });
+    expect(PROTOTYPE_SCENARIO.settlementProgression.levels[1]).toMatchObject({
+      id: "communal-center",
+      requirements: {
+        playerPlacedTileCount: 4,
+        resources: {
+          food: 8,
+          energy: 0,
+          nature: 8,
+          happiness: 4,
+        },
+      },
+    });
+    expect(PROTOTYPE_SCENARIO.settlementProgression.levels[2]).toMatchObject({
+      id: "metropolitan-heart",
+      requirements: {
+        playerPlacedTileCount: 9,
+        resources: {
+          food: 20,
+          energy: 3,
+          nature: 20,
+          happiness: 10,
+        },
+      },
+    });
+  });
+
   it("décrit un plateau irrégulier avec un bourg central", () => {
     expect(PROTOTYPE_SCENARIO.board.rows).toHaveLength(11);
     expect(PROTOTYPE_SCENARIO.board.initialTiles).toContainEqual({
@@ -57,5 +90,39 @@ describe("PROTOTYPE_SCENARIO", () => {
     );
 
     expect(bridges).toHaveLength(3);
+  });
+});
+
+// Les objectifs ci-dessous deviennent la condition de réussite du scénario.
+describe("contrat de territoire", () => {
+  it("définit trois objectifs lisibles", () => {
+    expect(PROTOTYPE_SCENARIO.contract.objectives).toHaveLength(3);
+    expect(
+      PROTOTYPE_SCENARIO.contract.objectives.map((objective) => objective.kind),
+    ).toEqual(["settlement-level", "resource-balance", "synergy-collection"]);
+  });
+
+  it("réutilise les seuils d'équilibre du score", () => {
+    const balanceObjective = PROTOTYPE_SCENARIO.contract.objectives.find(
+      (objective) => objective.kind === "resource-balance",
+    );
+
+    expect(balanceObjective).toMatchObject({
+      targets: PROTOTYPE_SCENARIO.scoring.balanceTargets,
+    });
+  });
+
+  it("demande irrigation, eau protégée et trois synergies fluviales", () => {
+    const riverObjective = PROTOTYPE_SCENARIO.contract.objectives.find(
+      (objective) => objective.kind === "synergy-collection",
+    );
+
+    expect(riverObjective).toMatchObject({
+      requiredDefinitionCounts: {
+        "protected-water": 1,
+        "field-irrigation": 1,
+      },
+      totalRequiredCount: 3,
+    });
   });
 });

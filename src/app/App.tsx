@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
+import { prototypeBoardCells } from "../content/prototypeBoard";
 import { PROTOTYPE_SCENARIO } from "../content/prototypeScenario";
 import { getPrototypeTurnProposals } from "../content/prototypeTurnProposals";
+import { TERRITORY_SYNERGY_DEFINITIONS } from "../content/territorySynergyDefinitions";
 import { getTerritoryTileDefinition } from "../content/territoryTileDefinitions";
 import {
   getTerritoryUpgradeDefinition,
@@ -21,6 +23,19 @@ import {
 } from "../engine/resources";
 import { calculateTerritoryScore } from "../engine/score";
 import {
+  createInitialScenarioObjectiveState,
+  getScenarioObjectiveProgress,
+  isScenarioContractCompleted,
+  recordScenarioObjectivePlacement,
+  updateScenarioObjectiveState,
+  type TerritoryScenarioObjectiveState,
+} from "../engine/scenarioObjectives";
+import {
+  createInitialSettlementLevelIndex,
+  getSettlementProgress,
+  getUnlockedSettlementLevelIndex,
+} from "../engine/settlementProgression";
+import {
   canCompleteScenario,
   createInitialTurnState,
   endTurn,
@@ -34,6 +49,7 @@ import type {
   SelectedUpgradeTypeId,
   TerritoryPlacementPreviewChangedPayload,
   TerritorySummaryChangedPayload,
+  TerritoryTilePlacedPayload,
 } from "../game/gameEvents";
 import "./App.css";
 
@@ -69,6 +85,11 @@ const RESOURCE_PRESENTATION = [
     tone: "happiness",
   },
 ] as const;
+
+const RIVER_SYNERGY_LABELS: Readonly<Record<string, string>> = {
+  "protected-water": "Eau protégée",
+  "field-irrigation": "Irrigation",
+};
 
 const TILE_PRESENTATION: Readonly<
   Record<
@@ -185,13 +206,34 @@ export function App() {
     useState<SelectedUpgradeTypeId>(null);
   const [selectedTileRotation, setSelectedTileRotation] =
     useState<HexRotation>(0);
+  const initialTerritorySummary = createEmptyTerritorySummary();
+  const territorySummaryRef = useRef(initialTerritorySummary);
   const [territorySummary, setTerritorySummary] =
-    useState<TerritorySummaryChangedPayload>(createEmptyTerritorySummary);
+    useState<TerritorySummaryChangedPayload>(initialTerritorySummary);
   const [placementPreview, setPlacementPreview] =
     useState<TerritoryPlacementPreviewChangedPayload>(null);
   const [improvementPoints, setImprovementPoints] = useState(() =>
     createInitialImprovementPoints(PROTOTYPE_SCENARIO.improvements),
   );
+  const initialSettlementLevelIndex = createInitialSettlementLevelIndex(
+    PROTOTYPE_SCENARIO.settlementProgression,
+  );
+  const settlementLevelIndexRef = useRef(initialSettlementLevelIndex);
+  const [settlementLevelIndex, setSettlementLevelIndex] = useState(
+    initialSettlementLevelIndex,
+  );
+  const [settlementAnnouncement, setSettlementAnnouncement] = useState<
+    string | null
+  >(null);
+  const initialObjectiveState = createInitialScenarioObjectiveState();
+  const objectiveStateRef = useRef<TerritoryScenarioObjectiveState>(
+    initialObjectiveState,
+  );
+  const [objectiveState, setObjectiveState] =
+    useState<TerritoryScenarioObjectiveState>(initialObjectiveState);
+  const [objectiveAnnouncement, setObjectiveAnnouncement] = useState<
+    string | null
+  >(null);
 
   const proposals = getPrototypeTurnProposals(turnState.number);
   const selectedTileDefinition =
@@ -205,8 +247,6 @@ export function App() {
     territorySummary.resources,
     PROTOTYPE_SCENARIO.scoring,
   );
-  const scenarioSucceeded =
-    scoreBreakdown.totalScore >= PROTOTYPE_SCENARIO.targetScore;
   const interactionsDisabled = gameCompleted;
   const scoreProgress = Math.min(
     100,
@@ -223,6 +263,39 @@ export function App() {
     nextImprovementPointTurn === null
       ? "Aucun nouveau point prévu"
       : `+${PROTOTYPE_SCENARIO.improvements.pointsPerGrant} au tour ${nextImprovementPointTurn}`;
+  const settlementProgress = getSettlementProgress(
+    settlementLevelIndex,
+    territorySummary.placedTileCount,
+    territorySummary.resources,
+    PROTOTYPE_SCENARIO.settlementProgression,
+  );
+  const currentSettlementLevel = settlementProgress.currentLevel;
+  const settlementResourceRequirements = RESOURCE_PRESENTATION.flatMap(
+    (resource) => {
+      const requirement = settlementProgress.resources?.[resource.key];
+
+      if (requirement === undefined || requirement.target === 0) {
+        return [];
+      }
+
+      return [{ ...resource, requirement }];
+    },
+  );
+  const objectiveProgress = getScenarioObjectiveProgress(
+    objectiveState,
+    {
+      settlementLevelIndex,
+      resources: territorySummary.resources,
+    },
+    PROTOTYPE_SCENARIO.contract,
+  );
+  const completedObjectiveCount = objectiveProgress.filter(
+    (objective) => objective.completed,
+  ).length;
+  const scenarioSucceeded = isScenarioContractCompleted(
+    objectiveState,
+    PROTOTYPE_SCENARIO.contract,
+  );
   const phase = !turnState.placementCompleted
     ? {
         index: 1,
@@ -253,6 +326,101 @@ export function App() {
     setPlacementPreview(null);
   }
 
+  function synchronizeObjectives(
+    candidateState: TerritoryScenarioObjectiveState,
+    summary: TerritorySummaryChangedPayload,
+    levelIndex: number,
+  ): void {
+    const result = updateScenarioObjectiveState(
+      candidateState,
+      {
+        settlementLevelIndex: levelIndex,
+        resources: summary.resources,
+      },
+      PROTOTYPE_SCENARIO.contract,
+    );
+
+    objectiveStateRef.current = result.state;
+    setObjectiveState(result.state);
+
+    if (result.newlyCompletedObjectiveIds.length === 0) {
+      return;
+    }
+
+    const completedLabels = result.newlyCompletedObjectiveIds
+      .map(
+        (objectiveId) =>
+          PROTOTYPE_SCENARIO.contract.objectives.find(
+            (objective) => objective.id === objectiveId,
+          )?.label,
+      )
+      .filter((label) => label !== undefined);
+
+    if (completedLabels.length > 0) {
+      setObjectiveAnnouncement(
+        completedLabels.length === 1
+          ? `Objectif accompli : ${completedLabels[0]}`
+          : `Objectifs accomplis : ${completedLabels.join(" · ")}`,
+      );
+    }
+  }
+
+  function handleTerritorySummaryChanged(
+    nextSummary: TerritorySummaryChangedPayload,
+  ): void {
+    territorySummaryRef.current = nextSummary;
+    setTerritorySummary(nextSummary);
+
+    const previousLevelIndex = settlementLevelIndexRef.current;
+    const nextLevelIndex = getUnlockedSettlementLevelIndex(
+      previousLevelIndex,
+      nextSummary.placedTileCount,
+      nextSummary.resources,
+      PROTOTYPE_SCENARIO.settlementProgression,
+    );
+
+    if (nextLevelIndex > previousLevelIndex) {
+      settlementLevelIndexRef.current = nextLevelIndex;
+      setSettlementLevelIndex(nextLevelIndex);
+
+      const nextLevel =
+        PROTOTYPE_SCENARIO.settlementProgression.levels[nextLevelIndex];
+
+      if (nextLevel !== undefined) {
+        setSettlementAnnouncement(`Le bourg devient ${nextLevel.label} !`);
+      }
+    }
+
+    synchronizeObjectives(
+      objectiveStateRef.current,
+      nextSummary,
+      nextLevelIndex,
+    );
+  }
+
+  function handleTilePlaced(payload: TerritoryTilePlacedPayload): void {
+    const placedCell = prototypeBoardCells.find(
+      (cell) => cell.id === payload.cellId,
+    );
+    const nextObjectiveState =
+      placedCell === undefined
+        ? objectiveStateRef.current
+        : recordScenarioObjectivePlacement(
+            objectiveStateRef.current,
+            placedCell,
+            payload.tileTypeId,
+            TERRITORY_SYNERGY_DEFINITIONS,
+          );
+
+    synchronizeObjectives(
+      nextObjectiveState,
+      territorySummaryRef.current,
+      settlementLevelIndexRef.current,
+    );
+    setTurnState((currentState) => markPlacementCompleted(currentState));
+    clearSelections();
+  }
+
   function handleEndTurn(): void {
     if (gameCompleted || !turnState.placementCompleted) {
       return;
@@ -266,6 +434,8 @@ export function App() {
 
     const nextTurnState = endTurn(turnState);
     setTurnState(nextTurnState);
+    setSettlementAnnouncement(null);
+    setObjectiveAnnouncement(null);
     setImprovementPoints((currentPoints) =>
       grantImprovementPointsForTurn(
         currentPoints,
@@ -280,7 +450,16 @@ export function App() {
     setGameRunId((currentId) => currentId + 1);
     setGameCompleted(false);
     setTurnState(createInitialTurnState());
-    setTerritorySummary(createEmptyTerritorySummary());
+    const emptySummary = createEmptyTerritorySummary();
+    territorySummaryRef.current = emptySummary;
+    setTerritorySummary(emptySummary);
+    settlementLevelIndexRef.current = initialSettlementLevelIndex;
+    setSettlementLevelIndex(initialSettlementLevelIndex);
+    setSettlementAnnouncement(null);
+    const emptyObjectiveState = createInitialScenarioObjectiveState();
+    objectiveStateRef.current = emptyObjectiveState;
+    setObjectiveState(emptyObjectiveState);
+    setObjectiveAnnouncement(null);
     setImprovementPoints(
       createInitialImprovementPoints(PROTOTYPE_SCENARIO.improvements),
     );
@@ -332,7 +511,7 @@ export function App() {
             <span>Score</span>
             <strong>
               {formatScore(scoreBreakdown.totalScore)}
-              <small> / {formatScore(PROTOTYPE_SCENARIO.targetScore)}</small>
+              <small> points</small>
             </strong>
           </div>
           <div className="header-improvement-points">
@@ -384,39 +563,226 @@ export function App() {
             <p>{nextImprovementPointLabel}</p>
           </section>
 
-          <section className="dashboard-section dashboard-score">
+          <section className="dashboard-section territory-contract-card">
             <div className="section-heading">
-              <h3>Objectif</h3>
-              <span>{Math.round(scoreProgress)} %</span>
+              <h3>{PROTOTYPE_SCENARIO.contract.label}</h3>
+              <span>
+                {completedObjectiveCount}/
+                {PROTOTYPE_SCENARIO.contract.objectives.length}
+              </span>
             </div>
-            <strong>{formatScore(scoreBreakdown.totalScore)}</strong>
-            <small>
-              sur {formatScore(PROTOTYPE_SCENARIO.targetScore)} points
-            </small>
+
+            <p className="territory-contract-card__description">
+              {PROTOTYPE_SCENARIO.contract.description}
+            </p>
+
             <div
-              className="progress-meter"
-              role="progressbar"
-              aria-label="Progression vers l'objectif de score"
-              aria-valuemin={0}
-              aria-valuemax={PROTOTYPE_SCENARIO.targetScore}
-              aria-valuenow={Math.min(
-                scoreBreakdown.totalScore,
-                PROTOTYPE_SCENARIO.targetScore,
-              )}
+              className="territory-contract-track"
+              aria-label={`${completedObjectiveCount} objectifs validés sur ${PROTOTYPE_SCENARIO.contract.objectives.length}`}
             >
-              <span style={{ width: `${scoreProgress}%` }} />
+              {PROTOTYPE_SCENARIO.contract.objectives.map((objective) => (
+                <span
+                  key={objective.id}
+                  className={
+                    objectiveState.completedObjectiveIds.includes(objective.id)
+                      ? "territory-contract-track__step territory-contract-track__step--done"
+                      : "territory-contract-track__step"
+                  }
+                />
+              ))}
             </div>
-            <div className="score-split">
-              <span>
-                Ressources
-                <strong>{formatScore(scoreBreakdown.resourceScore)}</strong>
-              </span>
-              <span>
-                Équilibre
-                <strong>+{formatScore(scoreBreakdown.balanceBonus)}</strong>
-              </span>
+
+            {settlementAnnouncement !== null ? (
+              <p
+                className="settlement-announcement"
+                role="status"
+                aria-live="polite"
+              >
+                ✦ {settlementAnnouncement}
+              </p>
+            ) : null}
+
+            {objectiveAnnouncement !== null ? (
+              <p
+                className="objective-announcement"
+                role="status"
+                aria-live="polite"
+              >
+                ✦ {objectiveAnnouncement}
+              </p>
+            ) : null}
+
+            <div className="territory-objective-list">
+              {objectiveProgress.map((objective) => (
+                <article
+                  key={objective.id}
+                  className={`territory-objective${
+                    objective.completed ? " territory-objective--done" : ""
+                  }`}
+                >
+                  <span
+                    className="territory-objective__icon"
+                    aria-hidden="true"
+                  >
+                    {objective.completed ? "✓" : objective.icon}
+                  </span>
+                  <div className="territory-objective__content">
+                    <div className="territory-objective__heading">
+                      <strong>{objective.label}</strong>
+                      <span>{objective.completed ? "Validé" : "En cours"}</span>
+                    </div>
+                    <small>{objective.description}</small>
+
+                    {objective.kind === "settlement-level" ? (
+                      <div className="territory-objective__summary">
+                        <span>{currentSettlementLevel.label}</span>
+                        <strong>
+                          {Math.min(
+                            objective.currentLevelIndex + 1,
+                            objective.targetLevelIndex + 1,
+                          )}
+                          /{objective.targetLevelIndex + 1}
+                        </strong>
+                      </div>
+                    ) : null}
+
+                    {objective.kind === "settlement-level" &&
+                    settlementProgress.nextLevel !== null &&
+                    settlementProgress.playerPlacedTileCount !== null ? (
+                      <div className="objective-resource-grid objective-resource-grid--settlement">
+                        <span
+                          className={
+                            settlementProgress.playerPlacedTileCount.reached
+                              ? "objective-resource objective-resource--done"
+                              : "objective-resource"
+                          }
+                        >
+                          <small>TUI</small>
+                          <strong>
+                            {settlementProgress.playerPlacedTileCount.current}/
+                            {settlementProgress.playerPlacedTileCount.target}
+                          </strong>
+                        </span>
+                        {settlementResourceRequirements.map(
+                          ({ key, shortLabel, requirement }) => (
+                            <span
+                              key={key}
+                              className={
+                                requirement.reached
+                                  ? "objective-resource objective-resource--done"
+                                  : "objective-resource"
+                              }
+                            >
+                              <small>{shortLabel}</small>
+                              <strong>
+                                {requirement.current}/{requirement.target}
+                              </strong>
+                            </span>
+                          ),
+                        )}
+                      </div>
+                    ) : null}
+
+                    {objective.kind === "resource-balance" ? (
+                      <div className="objective-resource-grid">
+                        {RESOURCE_PRESENTATION.map((resource) => {
+                          const requirement = objective.resources[resource.key];
+
+                          return (
+                            <span
+                              key={resource.key}
+                              className={
+                                requirement.reached
+                                  ? "objective-resource objective-resource--done"
+                                  : "objective-resource"
+                              }
+                            >
+                              <small>{resource.shortLabel}</small>
+                              <strong>
+                                {requirement.current}/{requirement.target}
+                              </strong>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    {objective.kind === "synergy-collection" ? (
+                      <div className="objective-synergy-progress">
+                        <div className="objective-synergy-progress__requirements">
+                          {objective.requirements.map((requirement) => (
+                            <span
+                              key={requirement.definitionId}
+                              className={
+                                requirement.reached
+                                  ? "objective-synergy-chip objective-synergy-chip--done"
+                                  : "objective-synergy-chip"
+                              }
+                            >
+                              {RIVER_SYNERGY_LABELS[requirement.definitionId] ??
+                                requirement.definitionId}
+                              <strong>
+                                {requirement.current}/{requirement.target}
+                              </strong>
+                            </span>
+                          ))}
+                        </div>
+                        <span className="objective-synergy-total">
+                          Synergies fluviales
+                          <strong>
+                            {objective.currentTotalCount}/
+                            {objective.totalRequiredCount}
+                          </strong>
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
             </div>
+
+            {scenarioSucceeded ? (
+              <p className="territory-contract-complete">
+                Contrat rempli. Continue jusqu'au dernier tour pour optimiser
+                ton score.
+              </p>
+            ) : null}
           </section>
+
+          <details className="dashboard-section performance-details">
+            <summary>
+              <span>Performance et score</span>
+              <strong>{formatScore(scoreBreakdown.totalScore)}</strong>
+            </summary>
+            <div className="performance-details__content">
+              <div
+                className="progress-meter"
+                role="progressbar"
+                aria-label="Progression vers le score de référence"
+                aria-valuemin={0}
+                aria-valuemax={PROTOTYPE_SCENARIO.targetScore}
+                aria-valuenow={Math.min(
+                  scoreBreakdown.totalScore,
+                  PROTOTYPE_SCENARIO.targetScore,
+                )}
+              >
+                <span style={{ width: `${scoreProgress}%` }} />
+              </div>
+              <p>
+                Référence : {formatScore(PROTOTYPE_SCENARIO.targetScore)} points
+              </p>
+              <div className="score-split">
+                <span>
+                  Ressources
+                  <strong>{formatScore(scoreBreakdown.resourceScore)}</strong>
+                </span>
+                <span>
+                  Équilibre
+                  <strong>+{formatScore(scoreBreakdown.balanceBonus)}</strong>
+                </span>
+              </div>
+            </div>
+          </details>
 
           <section className="dashboard-section dashboard-help">
             <h3>Repères</h3>
@@ -440,6 +806,7 @@ export function App() {
             <div className="map-badges">
               <span>{territorySummary.placedTileCount} tuiles</span>
               <span>{improvementPoints} pts d'aménagement</span>
+              <span>{currentSettlementLevel.label}</span>
               <span className={finalTurn ? "map-badge--final" : undefined}>
                 {finalTurn ? "Dernier tour" : `Tour ${turnState.number}`}
               </span>
@@ -453,12 +820,7 @@ export function App() {
               placementEnabled={
                 !interactionsDisabled && !turnState.placementCompleted
               }
-              onTilePlaced={() => {
-                setTurnState((currentState) =>
-                  markPlacementCompleted(currentState),
-                );
-                clearSelections();
-              }}
+              onTilePlaced={handleTilePlaced}
               selectedUpgradeTypeId={selectedUpgradeTypeId}
               improvementEnabled={
                 !interactionsDisabled &&
@@ -479,8 +841,13 @@ export function App() {
                 setSelectedTileRotation(0);
               }}
               selectedTileRotation={selectedTileRotation}
-              onTerritorySummaryChanged={setTerritorySummary}
+              onTerritorySummaryChanged={handleTerritorySummaryChanged}
               onPlacementPreviewChanged={setPlacementPreview}
+              settlementLevel={{
+                id: currentSettlementLevel.id,
+                label: currentSettlementLevel.label,
+                levelIndex: settlementLevelIndex,
+              }}
             />
 
             {placementPreview !== null ? (
@@ -529,139 +896,160 @@ export function App() {
           </header>
 
           <div className="actions-panel__body">
-            <section className="step-card">
+            <section
+              className={`step-card${
+                turnState.placementCompleted ? " step-card--complete" : ""
+              }`}
+            >
               <div className="step-card__heading">
-                <span>1</span>
+                <span>{turnState.placementCompleted ? "✓" : "1"}</span>
                 <div>
                   <strong>Choisir une tuile</strong>
-                  <small>Utilise les grandes cartes sous la map.</small>
+                  <small>
+                    {turnState.placementCompleted
+                      ? "Placement réalisé pour ce tour."
+                      : "Utilise les grandes cartes sous la map."}
+                  </small>
                 </div>
               </div>
 
-              {selectedTileDefinition === null ? (
-                <p className="selection-placeholder">
-                  Aucune proposition sélectionnée.
-                </p>
-              ) : (
-                <div className="selected-tile-summary">
-                  <span aria-hidden="true">
-                    {TILE_PRESENTATION[selectedTileTypeId ?? ""]?.icon ?? "⬡"}
-                  </span>
-                  <div>
-                    <strong>{selectedTileDefinition.label}</strong>
-                    <small>
-                      {formatResourceSummary(
-                        selectedTileDefinition.baseResources,
-                      )}
-                    </small>
-                  </div>
-                </div>
-              )}
+              {!turnState.placementCompleted ? (
+                <>
+                  {selectedTileDefinition === null ? (
+                    <p className="selection-placeholder">
+                      Aucune proposition sélectionnée.
+                    </p>
+                  ) : (
+                    <div className="selected-tile-summary">
+                      <span aria-hidden="true">
+                        {TILE_PRESENTATION[selectedTileTypeId ?? ""]?.icon ??
+                          "⬡"}
+                      </span>
+                      <div>
+                        <strong>{selectedTileDefinition.label}</strong>
+                        <small>
+                          {formatResourceSummary(
+                            selectedTileDefinition.baseResources,
+                          )}
+                        </small>
+                      </div>
+                    </div>
+                  )}
 
-              <button
-                type="button"
-                className="secondary-action"
-                disabled={
-                  interactionsDisabled ||
-                  turnState.placementCompleted ||
-                  !rotationEnabled
-                }
-                onClick={() => {
-                  setSelectedTileRotation((currentRotation) =>
-                    getNextHexRotation(currentRotation),
-                  );
-                }}
-              >
-                <span aria-hidden="true">↻</span>
-                <span>
-                  <strong>Tourner la tuile</strong>
-                  <small>
-                    {rotationEnabled
-                      ? `Position ${selectedTileRotation + 1}/6`
-                      : "Disponible pour les tuiles orientables"}
-                  </small>
-                </span>
-              </button>
+                  <button
+                    type="button"
+                    className="secondary-action"
+                    disabled={interactionsDisabled || !rotationEnabled}
+                    onClick={() => {
+                      setSelectedTileRotation((currentRotation) =>
+                        getNextHexRotation(currentRotation),
+                      );
+                    }}
+                  >
+                    <span aria-hidden="true">↻</span>
+                    <span>
+                      <strong>Tourner la tuile</strong>
+                      <small>
+                        {rotationEnabled
+                          ? `Position ${selectedTileRotation + 1}/6`
+                          : "Disponible pour les tuiles orientables"}
+                      </small>
+                    </span>
+                  </button>
+                </>
+              ) : null}
             </section>
 
-            <section className="step-card step-card--upgrades">
+            <section
+              className={`step-card step-card--upgrades${
+                turnState.improvementCompleted ? " step-card--complete" : ""
+              }`}
+            >
               <div className="step-card__heading">
-                <span>2</span>
+                <span>{turnState.improvementCompleted ? "✓" : "2"}</span>
                 <div>
                   <strong>Amélioration facultative</strong>
                   <small>
-                    {improvementPoints} point
-                    {improvementPoints === 1 ? "" : "s"} disponible
-                    {improvementPoints === 1 ? "" : "s"} ·{" "}
-                    {nextImprovementPointLabel}
+                    {turnState.improvementCompleted
+                      ? "Amélioration réalisée pour ce tour."
+                      : turnState.placementCompleted
+                        ? `${improvementPoints} point${
+                            improvementPoints === 1 ? "" : "s"
+                          } disponible${
+                            improvementPoints === 1 ? "" : "s"
+                          } · ${nextImprovementPointLabel}`
+                        : "Disponible après le placement."}
                   </small>
                 </div>
               </div>
 
-              <div className="upgrade-list">
-                {PROTOTYPE_UPGRADE_TYPE_IDS.map((upgradeTypeId) => {
-                  const definition =
-                    getTerritoryUpgradeDefinition(upgradeTypeId);
-                  const isSelected = selectedUpgradeTypeId === upgradeTypeId;
-                  const tone = getPrimaryResourceTone(definition.resourceBonus);
-                  const affordable = canSpendImprovementPoints(
-                    improvementPoints,
-                    definition.cost,
-                  );
+              {!turnState.placementCompleted ? (
+                <p className="step-card__locked">
+                  Pose d'abord une tuile pour débloquer les améliorations.
+                </p>
+              ) : !turnState.improvementCompleted ? (
+                <div className="upgrade-list">
+                  {PROTOTYPE_UPGRADE_TYPE_IDS.map((upgradeTypeId) => {
+                    const definition =
+                      getTerritoryUpgradeDefinition(upgradeTypeId);
+                    const isSelected = selectedUpgradeTypeId === upgradeTypeId;
+                    const tone = getPrimaryResourceTone(
+                      definition.resourceBonus,
+                    );
+                    const affordable = canSpendImprovementPoints(
+                      improvementPoints,
+                      definition.cost,
+                    );
 
-                  return (
-                    <button
-                      key={upgradeTypeId}
-                      type="button"
-                      className={`upgrade-action upgrade-action--${tone}${
-                        isSelected ? " upgrade-action--selected" : ""
-                      }`}
-                      aria-pressed={isSelected}
-                      aria-label={`${definition.label}, coût ${formatPointCost(
-                        definition.cost,
-                      )}`}
-                      disabled={
-                        interactionsDisabled ||
-                        !turnState.placementCompleted ||
-                        turnState.improvementCompleted ||
-                        !affordable
-                      }
-                      onClick={() => {
-                        setSelectedUpgradeTypeId(
-                          isSelected ? null : upgradeTypeId,
-                        );
-                        setSelectedTileTypeId(null);
-                        setSelectedTileRotation(0);
-                      }}
-                    >
-                      <span aria-hidden="true">
-                        {tone === "food"
-                          ? "✦"
-                          : tone === "energy"
-                            ? "ϟ"
-                            : tone === "happiness"
-                              ? "☀"
-                              : "⌁"}
-                      </span>
-                      <span className="upgrade-action__copy">
-                        <span className="upgrade-action__title-row">
-                          <strong>{definition.label}</strong>
-                          <em>{formatPointCost(definition.cost)}</em>
+                    return (
+                      <button
+                        key={upgradeTypeId}
+                        type="button"
+                        className={`upgrade-action upgrade-action--${tone}${
+                          isSelected ? " upgrade-action--selected" : ""
+                        }`}
+                        aria-pressed={isSelected}
+                        aria-label={`${definition.label}, coût ${formatPointCost(
+                          definition.cost,
+                        )}`}
+                        disabled={interactionsDisabled || !affordable}
+                        onClick={() => {
+                          setSelectedUpgradeTypeId(
+                            isSelected ? null : upgradeTypeId,
+                          );
+                          setSelectedTileTypeId(null);
+                          setSelectedTileRotation(0);
+                        }}
+                      >
+                        <span aria-hidden="true">
+                          {tone === "food"
+                            ? "✦"
+                            : tone === "energy"
+                              ? "ϟ"
+                              : tone === "happiness"
+                                ? "☀"
+                                : "⌁"}
                         </span>
-                        <small>
-                          {definition.targetLabel} ·{" "}
-                          {formatResourceSummary(definition.resourceBonus)}
-                        </small>
-                        {!affordable ? (
-                          <small className="upgrade-action__unavailable">
-                            Points insuffisants
+                        <span className="upgrade-action__copy">
+                          <span className="upgrade-action__title-row">
+                            <strong>{definition.label}</strong>
+                            <em>{formatPointCost(definition.cost)}</em>
+                          </span>
+                          <small>
+                            {definition.targetLabel} ·{" "}
+                            {formatResourceSummary(definition.resourceBonus)}
                           </small>
-                        ) : null}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                          {!affordable ? (
+                            <small className="upgrade-action__unavailable">
+                              Points insuffisants
+                            </small>
+                          ) : null}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </section>
           </div>
 
@@ -788,13 +1176,35 @@ export function App() {
                 scenarioSucceeded ? " game-result__status--success" : ""
               }`}
             >
-              {scenarioSucceeded ? "Commune réussie" : "Commune encore fragile"}
+              {scenarioSucceeded ? "Commune accomplie" : "Contrat incomplet"}
             </p>
+
+            <div className="game-result__objectives">
+              {objectiveProgress.map((objective) => (
+                <div
+                  key={objective.id}
+                  className={
+                    objective.completed
+                      ? "game-result-objective game-result-objective--done"
+                      : "game-result-objective"
+                  }
+                >
+                  <span aria-hidden="true">
+                    {objective.completed ? "✓" : objective.icon}
+                  </span>
+                  <div>
+                    <strong>{objective.label}</strong>
+                    <small>
+                      {objective.completed ? "Objectif validé" : "Non atteint"}
+                    </small>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             <p className="game-result__score">
               <strong>{formatScore(scoreBreakdown.totalScore)}</strong>
-              <span>
-                Objectif : {formatScore(PROTOTYPE_SCENARIO.targetScore)} points
-              </span>
+              <span>Score de performance</span>
             </p>
             <dl className="resource-results">
               {RESOURCE_PRESENTATION.map((resource) => (
@@ -813,15 +1223,17 @@ export function App() {
               </span>
             </div>
             <p className="game-result__hint">
+              Niveau du bourg atteint : {currentSettlementLevel.label}
+            </p>
+            <p className="game-result__hint">
               Points d'aménagement restants : {improvementPoints}
             </p>
             {!scenarioSucceeded ? (
-              <p className="game-result__hint">
-                Il manque{" "}
-                {formatScore(
-                  PROTOTYPE_SCENARIO.targetScore - scoreBreakdown.totalScore,
-                )}{" "}
-                points pour atteindre l'objectif.
+              <p className="game-result__hint game-result__hint--warning">
+                {completedObjectiveCount} objectif
+                {completedObjectiveCount === 1 ? "" : "s"} validé
+                {completedObjectiveCount === 1 ? "" : "s"} sur{" "}
+                {PROTOTYPE_SCENARIO.contract.objectives.length}.
               </p>
             ) : null}
             <button

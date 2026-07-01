@@ -1529,3 +1529,531 @@ p {
     min-width: 68px;
   }
 }
+
+/* Évolution du bourg */
+.dashboard-panel {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.dashboard-panel > header,
+.dashboard-panel > .dashboard-section {
+  flex: 0 0 auto;
+}
+
+.settlement-progress-card {
+  background: linear-gradient(145deg, #f3f7ed, #e8f0df);
+}
+
+.settlement-level-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settlement-level-heading > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 12px;
+  color: #fff;
+  background: #315f3e;
+  box-shadow: 0 7px 18px rgb(49 95 62 / 18%);
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.settlement-level-heading strong,
+.settlement-level-heading small {
+  display: block;
+}
+
+.settlement-level-heading strong {
+  color: var(--ink-950);
+  font-size: 0.86rem;
+}
+
+.settlement-level-heading small {
+  margin-top: 3px;
+  color: var(--ink-500);
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+
+.settlement-level-track {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin: 14px 5px 12px;
+}
+
+.settlement-level-track::before {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  right: 5px;
+  left: 5px;
+  height: 3px;
+  border-radius: 999px;
+  background: #cdd9c7;
+  content: "";
+  transform: translateY(-50%);
+}
+
+.settlement-level-dot {
+  position: relative;
+  z-index: 1;
+  width: 13px;
+  height: 13px;
+  border: 3px solid #edf3e9;
+  border-radius: 999px;
+  background: #b7c5b1;
+  box-shadow: 0 0 0 1px #aebda8;
+}
+
+.settlement-level-dot--reached {
+  background: #4c8057;
+  box-shadow: 0 0 0 1px #3d6b49;
+}
+
+.settlement-level-dot--current {
+  transform: scale(1.25);
+  box-shadow:
+    0 0 0 1px #2e5e3a,
+    0 0 0 5px rgb(76 128 87 / 15%);
+}
+
+.settlement-announcement {
+  margin: 0 0 10px;
+  padding: 8px 9px;
+  border: 1px solid #cfaa57;
+  border-radius: 10px;
+  color: #644619;
+  background: #fff4cf;
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.settlement-next-level {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: var(--ink-500);
+  font-size: 0.65rem;
+}
+
+.settlement-next-level strong {
+  color: var(--ink-800);
+}
+
+.settlement-requirements {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.settlement-requirement {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid #d4ddd0;
+  border-radius: 9px;
+  color: var(--ink-500);
+  background: rgb(255 255 255 / 66%);
+}
+
+.settlement-requirement small {
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.settlement-requirement strong {
+  color: var(--ink-800);
+  font-size: 0.7rem;
+}
+
+.settlement-requirement--done {
+  border-color: #9fbe9c;
+  color: #376746;
+  background: #edf7e8;
+}
+
+.settlement-requirement--done strong::after {
+  margin-left: 3px;
+  color: #43814f;
+  content: "✓";
+}
+
+.settlement-complete {
+  margin: 12px 0 0;
+  padding: 9px;
+  border-radius: 10px;
+  color: #315f3e;
+  background: #e1efdc;
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .settlement-requirements {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .settlement-requirements {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Contrat de territoire et objectifs de scénario                             */
+/* -------------------------------------------------------------------------- */
+
+.territory-contract-card {
+  display: grid;
+  gap: 12px;
+}
+
+.territory-contract-card__description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.territory-contract-track {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.territory-contract-track__step {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(42, 73, 48, 0.14);
+}
+
+.territory-contract-track__step--done {
+  background: #6f9b63;
+  box-shadow: 0 0 12px rgba(111, 155, 99, 0.38);
+}
+
+.objective-announcement,
+.territory-contract-complete {
+  margin: 0;
+  border: 1px solid rgba(111, 155, 99, 0.32);
+  border-radius: 12px;
+  background: rgba(227, 242, 216, 0.82);
+  color: #315a32;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.4;
+  padding: 9px 11px;
+}
+
+.territory-objective-list {
+  display: grid;
+  gap: 8px;
+}
+
+.territory-objective {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 9px;
+  border: 1px solid rgba(42, 73, 48, 0.13);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.52);
+  padding: 10px;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.territory-objective--done {
+  border-color: rgba(91, 139, 80, 0.38);
+  background: rgba(229, 243, 219, 0.76);
+}
+
+.territory-objective__icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(56, 94, 63, 0.1);
+  color: #315a32;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.territory-objective--done .territory-objective__icon {
+  background: #5f8d55;
+  color: #fff;
+}
+
+.territory-objective__content {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.territory-objective__content > small {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.territory-objective__heading,
+.territory-objective__summary,
+.objective-synergy-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.territory-objective__heading strong {
+  color: var(--text-strong);
+  font-size: 0.82rem;
+}
+
+.territory-objective__heading span {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.territory-objective--done .territory-objective__heading span {
+  color: #4f7c48;
+}
+
+.territory-objective__summary {
+  border-radius: 9px;
+  background: rgba(42, 73, 48, 0.07);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  padding: 6px 8px;
+}
+
+.territory-objective__summary strong {
+  color: var(--text-strong);
+}
+
+.objective-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.objective-resource {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border-radius: 8px;
+  background: rgba(42, 73, 48, 0.07);
+  padding: 5px 3px;
+  text-align: center;
+}
+
+.objective-resource small {
+  color: var(--text-muted);
+  font-size: 0.56rem;
+  font-weight: 800;
+}
+
+.objective-resource strong {
+  color: var(--text-strong);
+  font-size: 0.67rem;
+}
+
+.objective-resource--done {
+  background: rgba(112, 158, 98, 0.2);
+}
+
+.objective-resource--done strong {
+  color: #3f713c;
+}
+
+.objective-synergy-progress {
+  display: grid;
+  gap: 6px;
+}
+
+.objective-synergy-progress__requirements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.objective-synergy-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex: 1 1 112px;
+  border-radius: 8px;
+  background: rgba(74, 145, 169, 0.1);
+  color: #41666f;
+  font-size: 0.65rem;
+  padding: 5px 7px;
+}
+
+.objective-synergy-chip--done {
+  background: rgba(89, 155, 174, 0.2);
+  color: #285d69;
+}
+
+.objective-synergy-total {
+  border-radius: 9px;
+  background: rgba(42, 73, 48, 0.07);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  padding: 6px 8px;
+}
+
+.objective-synergy-total strong {
+  color: var(--text-strong);
+}
+
+.performance-details {
+  padding: 0;
+}
+
+.performance-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+  padding: 13px 15px;
+}
+
+.performance-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.performance-details > summary span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.performance-details > summary strong {
+  color: var(--text-strong);
+  font-size: 0.9rem;
+}
+
+.performance-details__content {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid rgba(42, 73, 48, 0.1);
+  padding: 12px 15px 15px;
+}
+
+.performance-details__content > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+/* Le panneau d'actions n'affiche plus les contrôles des phases déjà passées. */
+.step-card--complete {
+  padding-block: 12px;
+  background: rgba(229, 243, 219, 0.6);
+}
+
+.step-card--complete .step-card__heading > span {
+  background: #5f8d55;
+  color: #fff;
+}
+
+.step-card__locked {
+  margin: 10px 0 0;
+  border-radius: 10px;
+  background: rgba(42, 73, 48, 0.05);
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  padding: 9px 10px;
+}
+
+.game-result__objectives {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.game-result-objective {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(42, 73, 48, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  padding: 9px 11px;
+  text-align: left;
+}
+
+.game-result-objective > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(42, 73, 48, 0.09);
+  color: #315a32;
+  font-weight: 900;
+}
+
+.game-result-objective > div {
+  display: grid;
+  gap: 2px;
+}
+
+.game-result-objective strong {
+  color: var(--text-strong);
+  font-size: 0.82rem;
+}
+
+.game-result-objective small {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.game-result-objective--done {
+  border-color: rgba(91, 139, 80, 0.38);
+  background: rgba(229, 243, 219, 0.76);
+}
+
+.game-result-objective--done > span {
+  background: #5f8d55;
+  color: #fff;
+}
+
+.game-result__hint--warning {
+  color: #8b5d32;
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .objective-resource-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -5,6 +5,8 @@ import type {
 import type { BoardEdgeFeatureKind } from "../engine/board";
 import type { HexCoordinate, HexRotation, HexSide } from "../engine/hex";
 import type { TerritoryResources } from "../engine/resources";
+import type { TerritoryScenarioContractDefinition } from "../engine/scenarioObjectives";
+import type { TerritorySettlementProgressionDefinition } from "../engine/settlementProgression";
 
 export interface TerritoryScoringDefinition {
   resourceWeights: TerritoryResources;
@@ -57,6 +59,8 @@ export interface TerritoryScenarioDefinition {
   targetScore: number;
   scoring: TerritoryScoringDefinition;
   improvements: TerritoryImprovementPointsDefinition;
+  settlementProgression: TerritorySettlementProgressionDefinition;
+  contract: TerritoryScenarioContractDefinition;
   board: TerritoryScenarioBoardDefinition;
 }
 
@@ -93,6 +97,89 @@ export const PROTOTYPE_SCENARIO = {
     initialPoints: 2,
     pointsPerGrant: 1,
     pointsGrantedAtTurns: [4, 7, 10, 13],
+  },
+  settlementProgression: {
+    levels: [
+      {
+        id: "village",
+        label: "Bourg",
+        description: "Le noyau initial autour duquel la commune se développe.",
+        requirements: null,
+      },
+      {
+        id: "communal-center",
+        label: "Centre communal",
+        description:
+          "Un centre plus vivant, soutenu par une première base de ressources équilibrée.",
+        requirements: {
+          playerPlacedTileCount: 4,
+          resources: {
+            food: 8,
+            energy: 0,
+            nature: 8,
+            happiness: 4,
+          },
+        },
+      },
+      {
+        id: "metropolitan-heart",
+        label: "Cœur métropolitain",
+        description:
+          "Un pôle structurant capable d'animer l'ensemble du territoire.",
+        requirements: {
+          playerPlacedTileCount: 9,
+          resources: {
+            food: 20,
+            energy: 3,
+            nature: 20,
+            happiness: 10,
+          },
+        },
+      },
+    ],
+  },
+  contract: {
+    label: "Contrat de territoire",
+    description:
+      "Transforme le territoire en une commune développée, équilibrée et attentive à son fleuve.",
+    objectives: [
+      {
+        id: "settlement-development",
+        kind: "settlement-level",
+        icon: "⌂",
+        label: "Développement",
+        description: "Fais évoluer le bourg jusqu'au Cœur métropolitain.",
+        targetLevelIndex: 2,
+        targetLabel: "Cœur métropolitain",
+      },
+      {
+        id: "territorial-balance",
+        kind: "resource-balance",
+        icon: "⚖",
+        label: "Équilibre territorial",
+        description:
+          "Atteins simultanément les quatre besoins essentiels de la commune.",
+        targets: {
+          food: 35,
+          energy: 6,
+          nature: 35,
+          happiness: 20,
+        },
+      },
+      {
+        id: "river-valorization",
+        kind: "synergy-collection",
+        icon: "≈",
+        label: "Garonne valorisée",
+        description:
+          "Crée de l'irrigation, protège les berges et réalise trois synergies fluviales.",
+        requiredDefinitionCounts: {
+          "protected-water": 1,
+          "field-irrigation": 1,
+        },
+        totalRequiredCount: 3,
+      },
+    ],
   },
   board: {
     rows: [
