@@ -2,16 +2,14 @@ import Phaser from "phaser";
 
 import type { TerritoryPlacementPreview } from "../../engine/placementPreview";
 import type { TerritoryResources } from "../../engine/resources";
+import { TERRITORY_MAP_CONTAINER_NAME } from "../territory/TerritoryMapCameraController";
 
 export function formatResourceDelta(delta: TerritoryResources): string[] {
   const lines: string[] = [];
 
   addResourceLine(lines, "Nourriture", delta.food);
-
   addResourceLine(lines, "Énergie", delta.energy);
-
   addResourceLine(lines, "Nature", delta.nature);
-
   addResourceLine(lines, "Bonheur", delta.happiness);
 
   return lines;
@@ -23,7 +21,6 @@ export function formatPlacementPreview(
   const resourceSummary = formatResourceDelta(preview.resourceDelta).join(
     " · ",
   );
-
   const lines = [
     resourceSummary.length > 0
       ? `Aperçu : ${resourceSummary}`
@@ -66,6 +63,8 @@ export function showResourceDeltaFeedback(
     .setOrigin(0.5)
     .setDepth(50);
 
+  addToTerritoryMapContainer(scene, feedbackText);
+
   scene.tweens.add({
     targets: feedbackText,
     y: feedbackText.y - 30,
@@ -107,6 +106,8 @@ export function showSynergyFeedback(
     .setOrigin(0.5)
     .setDepth(60);
 
+  addToTerritoryMapContainer(scene, feedbackText);
+
   for (const graphics of affectedGraphics) {
     scene.tweens.add({
       targets: graphics,
@@ -135,6 +136,16 @@ function addResourceLine(lines: string[], label: string, amount: number): void {
   }
 
   const sign = amount > 0 ? "+" : "";
-
   lines.push(`${sign}${amount} ${label}`);
+}
+
+function addToTerritoryMapContainer(
+  scene: Phaser.Scene,
+  gameObject: Phaser.GameObjects.GameObject,
+): void {
+  const mapContainer = scene.children.getByName(TERRITORY_MAP_CONTAINER_NAME);
+
+  if (mapContainer instanceof Phaser.GameObjects.Container) {
+    mapContainer.add(gameObject);
+  }
 }

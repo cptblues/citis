@@ -35,6 +35,7 @@ export class TerritoryContentView {
       cellView.centerY,
     ).setScale(cellView.contentScale);
 
+    cellView.mapContainer.add(container);
     this.placedTileContentViews.set(tile.id, container);
   }
 
@@ -56,6 +57,7 @@ export class TerritoryContentView {
       cellView.centerY,
     ).setScale(cellView.contentScale);
 
+    cellView.mapContainer.add(upgradeView);
     this.placedUpgradeViews.set(viewKey, upgradeView);
   }
 }

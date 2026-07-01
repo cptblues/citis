@@ -18,6 +18,10 @@ import {
 import { canApplyTerritoryUpgrade } from "../../engine/upgrades";
 import type { SelectedTileTypeId, SelectedUpgradeTypeId } from "../gameEvents";
 import { createTerritoryTileContent } from "../rendering/territoryTileContent";
+import {
+  TERRITORY_MAP_CONTAINER_NAME,
+  TerritoryMapCameraController,
+} from "./TerritoryMapCameraController";
 
 const BOARD_LEFT = 28;
 const BOARD_RIGHT = 932;
@@ -31,9 +35,6 @@ const EMPTY_FILL_COLOR = 0xffffff;
 const EMPTY_STROKE_COLOR = 0x9ba79c;
 const BLOCKED_FILL_COLOR = 0xc8ceca;
 const BLOCKED_STROKE_COLOR = 0x7d8781;
-const AVAILABLE_FILL_COLOR = 0xdcebd2;
-const AVAILABLE_HOVER_COLOR = 0xc5e2b7;
-const AVAILABLE_STROKE_COLOR = 0x4f8058;
 const SYNERGY_PREVIEW_STROKE_COLOR = 0x765da8;
 const SYNERGY_PREVIEW_STROKE_WIDTH = 6;
 const UPGRADE_PREVIEW_STROKE_COLOR = 0xd08b45;
@@ -79,6 +80,7 @@ export interface TerritoryCellView {
   centerX: number;
   centerY: number;
   contentScale: number;
+  mapContainer: Phaser.GameObjects.Container;
 }
 
 export interface TerritoryBoardVisualState {
@@ -104,8 +106,10 @@ export class TerritoryBoardView {
   private readonly getVisualState: () => TerritoryBoardVisualState;
   private readonly callbacks: TerritoryBoardCallbacks;
   private readonly cellViews = new Map<string, TerritoryCellView>();
+  private readonly mapContainer: Phaser.GameObjects.Container;
   private readonly networkGraphics: Phaser.GameObjects.Graphics;
   private readonly layout: TerritoryBoardLayout;
+  private readonly cameraController: TerritoryMapCameraController;
   private hoveredCellId: string | null = null;
 
   public constructor(
@@ -119,11 +123,59 @@ export class TerritoryBoardView {
     this.getVisualState = getVisualState;
     this.callbacks = callbacks;
     this.layout = createBoardLayout(cells);
-    this.networkGraphics = this.scene.add.graphics().setDepth(6);
+    this.mapContainer = this.scene.add
+      .container(0, 0)
+      .setName(TERRITORY_MAP_CONTAINER_NAME)
+      .setDepth(0);
+
+    const maskGraphics = new Phaser.GameObjects.Graphics(this.scene);
+    maskGraphics.fillStyle(0xffffff, 1);
+    maskGraphics.fillRect(
+      BOARD_LEFT,
+      BOARD_TOP,
+      BOARD_RIGHT - BOARD_LEFT,
+      BOARD_BOTTOM - BOARD_TOP,
+    );
+    this.mapContainer.setMask(maskGraphics.createGeometryMask());
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.mapContainer.clearMask(true);
+      maskGraphics.destroy();
+    });
+
+    this.networkGraphics = this.scene.add.graphics();
 
     this.createCells();
+    this.mapContainer.add(this.networkGraphics);
     this.drawNetworks();
     this.drawInitialTileContents();
+
+    const contentBounds = createMapContentBounds(this.cellViews.values());
+    const focusPoint = this.getInitialFocusPoint(contentBounds);
+    this.cameraController = new TerritoryMapCameraController({
+      scene: this.scene,
+      mapContainer: this.mapContainer,
+      viewport: new Phaser.Geom.Rectangle(
+        BOARD_LEFT,
+        BOARD_TOP,
+        BOARD_RIGHT - BOARD_LEFT,
+        BOARD_BOTTOM - BOARD_TOP,
+      ),
+      contentBounds,
+      focusPoint,
+      onCellClick: (cellId) => {
+        const cell = this.cellViews.get(cellId)?.cell;
+
+        if (cell === undefined) {
+          return;
+        }
+
+        this.callbacks.onCellPointerDown(cell);
+        this.redrawAll();
+      },
+      onDragStart: () => {
+        this.clearHoveredCell();
+      },
+    });
   }
 
   public redrawAll(): void {
@@ -176,7 +228,8 @@ export class TerritoryBoardView {
     centerX: number,
     centerY: number,
   ): void {
-    const graphics = this.scene.add.graphics().setDepth(0);
+    const graphics = this.scene.add.graphics();
+    this.mapContainer.add(graphics);
 
     this.cellViews.set(cell.id, {
       cell,
@@ -185,6 +238,7 @@ export class TerritoryBoardView {
       centerX,
       centerY,
       contentScale: this.layout.contentScale,
+      mapContainer: this.mapContainer,
     });
 
     if (cell.blocked !== true) {
@@ -193,13 +247,24 @@ export class TerritoryBoardView {
         Phaser.Geom.Polygon.Contains,
       );
 
-      graphics.on("pointerover", () => {
+      graphics.on("pointerover", (pointer: Phaser.Input.Pointer) => {
+        if (
+          !this.isPointerInsideBoard(pointer) ||
+          this.cameraController?.isDragging() === true
+        ) {
+          return;
+        }
+
         this.hoveredCellId = cell.id;
         this.callbacks.onCellPointerOver(cell);
         this.redrawAll();
       });
 
       graphics.on("pointerout", () => {
+        if (this.cameraController?.isDragging() === true) {
+          return;
+        }
+
         if (this.hoveredCellId === cell.id) {
           this.hoveredCellId = null;
         }
@@ -208,9 +273,8 @@ export class TerritoryBoardView {
         this.redrawAll();
       });
 
-      graphics.on("pointerdown", () => {
-        this.callbacks.onCellPointerDown(cell);
-        this.redrawAll();
+      graphics.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+        this.cameraController?.registerCellPointerDown(pointer, cell.id);
       });
     }
 
@@ -229,6 +293,9 @@ export class TerritoryBoardView {
     const isAvailable = state.availableCellIds.has(cellId);
     const isHovered = this.hoveredCellId === cellId;
     const isBlocked = cellView.cell.blocked === true;
+    const selectedTileTypeId = state.selectedTileTypeId;
+    const placementHighlightVisible =
+      isAvailable && state.placementEnabled && selectedTileTypeId !== null;
 
     let fillColor = isBlocked ? BLOCKED_FILL_COLOR : EMPTY_FILL_COLOR;
     let fillAlpha = isBlocked ? 0.78 : 0.12;
@@ -241,22 +308,13 @@ export class TerritoryBoardView {
       fillAlpha = 1;
       strokeColor = definition.strokeColor;
       strokeWidth = Math.max(2, this.layout.hexSize * 0.05);
-    } else if (isAvailable) {
-      if (state.placementEnabled && state.selectedTileTypeId !== null) {
-        const selectedDefinition = getTerritoryTileDefinition(
-          state.selectedTileTypeId,
-        );
-        fillColor = isHovered
-          ? selectedDefinition.hoverColor
-          : selectedDefinition.fillColor;
-        fillAlpha = isHovered ? 0.7 : 0.28;
-        strokeColor = selectedDefinition.strokeColor;
-      } else {
-        fillColor = isHovered ? AVAILABLE_HOVER_COLOR : AVAILABLE_FILL_COLOR;
-        fillAlpha = 0.8;
-        strokeColor = AVAILABLE_STROKE_COLOR;
-      }
-
+    } else if (placementHighlightVisible && selectedTileTypeId !== null) {
+      const selectedDefinition = getTerritoryTileDefinition(selectedTileTypeId);
+      fillColor = isHovered
+        ? selectedDefinition.hoverColor
+        : selectedDefinition.fillColor;
+      fillAlpha = isHovered ? 0.7 : 0.28;
+      strokeColor = selectedDefinition.strokeColor;
       strokeWidth = isHovered ? 5 : 3;
     }
 
@@ -294,10 +352,62 @@ export class TerritoryBoardView {
     cellView.graphics.lineStyle(
       strokeWidth,
       strokeColor,
-      placedTile === undefined && !isAvailable && !isBlocked ? 0.35 : 1,
+      placedTile === undefined && !placementHighlightVisible && !isBlocked
+        ? 0.35
+        : 1,
     );
     cellView.graphics.fillPoints(cellView.corners, true);
     cellView.graphics.strokePoints(cellView.corners, true);
+  }
+
+  private isPointerInsideBoard(pointer: Phaser.Input.Pointer): boolean {
+    return (
+      pointer.x >= BOARD_LEFT &&
+      pointer.x <= BOARD_RIGHT &&
+      pointer.y >= BOARD_TOP &&
+      pointer.y <= BOARD_BOTTOM
+    );
+  }
+
+  private clearHoveredCell(): void {
+    if (this.hoveredCellId === null) {
+      return;
+    }
+
+    const hoveredCell = this.cellViews.get(this.hoveredCellId)?.cell;
+    this.hoveredCellId = null;
+
+    if (hoveredCell !== undefined) {
+      this.callbacks.onCellPointerOut(hoveredCell);
+    }
+
+    this.redrawAll();
+  }
+
+  private getInitialFocusPoint(
+    contentBounds: Phaser.Geom.Rectangle,
+  ): Phaser.Math.Vector2 {
+    const initialTown = this.getVisualState().boardState.placedTiles.find(
+      (tile) => tile.typeId === "town",
+    );
+
+    if (initialTown !== undefined) {
+      const townCellView = this.cellViews.get(
+        createBoardCellId(initialTown.q, initialTown.r),
+      );
+
+      if (townCellView !== undefined) {
+        return new Phaser.Math.Vector2(
+          townCellView.centerX,
+          townCellView.centerY,
+        );
+      }
+    }
+
+    return new Phaser.Math.Vector2(
+      contentBounds.centerX,
+      contentBounds.centerY,
+    );
   }
 
   private drawNetworks(): void {
@@ -476,14 +586,43 @@ export class TerritoryBoardView {
         continue;
       }
 
-      createTerritoryTileContent(
+      const content = createTerritoryTileContent(
         this.scene,
         tile,
         cellView.centerX,
         cellView.centerY,
       ).setScale(cellView.contentScale);
+
+      this.mapContainer.add(content);
     }
   }
+}
+
+function createMapContentBounds(
+  cellViews: Iterable<TerritoryCellView>,
+): Phaser.Geom.Rectangle {
+  const corners = [...cellViews].flatMap((cellView) => cellView.corners);
+
+  if (corners.length === 0) {
+    return new Phaser.Geom.Rectangle(
+      BOARD_LEFT,
+      BOARD_TOP,
+      BOARD_RIGHT - BOARD_LEFT,
+      BOARD_BOTTOM - BOARD_TOP,
+    );
+  }
+
+  const minimumX = Math.min(...corners.map((corner) => corner.x));
+  const maximumX = Math.max(...corners.map((corner) => corner.x));
+  const minimumY = Math.min(...corners.map((corner) => corner.y));
+  const maximumY = Math.max(...corners.map((corner) => corner.y));
+
+  return new Phaser.Geom.Rectangle(
+    minimumX,
+    minimumY,
+    maximumX - minimumX,
+    maximumY - minimumY,
+  );
 }
 
 function createBoardLayout(cells: readonly BoardCell[]): TerritoryBoardLayout {

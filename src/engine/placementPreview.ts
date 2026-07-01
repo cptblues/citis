@@ -63,25 +63,21 @@ export function previewTerritoryTilePlacement(
     synergyDefinitions,
     upgradeDefinitions,
   );
-
   const nextResources = calculateTerritoryResources(
     nextState,
     resourceDefinitions,
     synergyDefinitions,
     upgradeDefinitions,
   );
-
   const previousSynergyIds = new Set(
     calculateTerritorySynergies(state, synergyDefinitions).map(
       (synergy) => synergy.id,
     ),
   );
-
   const createdSynergies = calculateTerritorySynergies(
     nextState,
     synergyDefinitions,
   ).filter((synergy) => !previousSynergyIds.has(synergy.id));
-
   const affectedCellIds = new Set<string>();
 
   for (const synergy of createdSynergies) {
@@ -102,7 +98,48 @@ export function previewTerritoryTilePlacement(
       previousResources,
       nextResources,
     ),
-    createdSynergies,
+    createdSynergies: createdSynergies.map((synergy) => ({
+      ...synergy,
+      label: formatTerritorySynergyPreviewLabel(synergy),
+    })),
     affectedCellIds: [...affectedCellIds],
   };
+}
+
+/**
+ * Le bandeau React consomme actuellement le label de la synergie. On y ajoute
+ * donc le bonus propre à la synergie, sans toucher au calcul des ressources.
+ */
+export function formatTerritorySynergyPreviewLabel(
+  synergy: ActiveTerritorySynergy,
+): string {
+  const gains = formatResourceBonus(synergy.resourceBonus);
+
+  return gains.length === 0
+    ? synergy.label
+    : `${synergy.label} (${gains.join(" · ")})`;
+}
+
+function formatResourceBonus(resources: TerritoryResources): string[] {
+  const gains: string[] = [];
+
+  addResourceBonus(gains, "Nourriture", resources.food);
+  addResourceBonus(gains, "Énergie", resources.energy);
+  addResourceBonus(gains, "Nature", resources.nature);
+  addResourceBonus(gains, "Bonheur", resources.happiness);
+
+  return gains;
+}
+
+function addResourceBonus(
+  gains: string[],
+  label: string,
+  amount: number,
+): void {
+  if (amount === 0) {
+    return;
+  }
+
+  const sign = amount > 0 ? "+" : "";
+  gains.push(`${sign}${amount} ${label}`);
 }

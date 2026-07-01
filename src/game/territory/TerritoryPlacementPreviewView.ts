@@ -57,6 +57,8 @@ export class TerritoryPlacementPreviewView {
     this.previewSynergyCellIds = new Set(options.affectedCellIds);
     this.placementPreviewValid = options.valid;
     this.previewText.setText(options.message);
+    this.placementGhostView?.destroy(true);
+    this.placementGhostView = null;
 
     const definition = getTerritoryTileDefinition(options.tileTypeId);
 
@@ -74,8 +76,8 @@ export class TerritoryPlacementPreviewView {
 
     ghost
       .setScale(options.cellView.contentScale)
-      .setAlpha(options.valid ? 0.65 : 0.25)
-      .setDepth(15);
+      .setAlpha(options.valid ? 0.65 : 0.25);
+    options.cellView.mapContainer.add(ghost);
     this.placementGhostView = ghost;
   }
 
