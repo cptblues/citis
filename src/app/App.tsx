@@ -27,35 +27,82 @@ import type {
   SelectedUpgradeTypeId,
   TerritorySummaryChangedPayload,
 } from "../game/gameEvents";
-
 import "./App.css";
+
+type ResourceTone = "food" | "energy" | "nature" | "happiness";
 
 const RESOURCE_PRESENTATION = [
   {
     key: "food",
     label: "Nourriture",
     shortLabel: "NOU",
+    icon: "✦",
     tone: "food",
   },
   {
     key: "energy",
     label: "Énergie",
     shortLabel: "ÉNE",
+    icon: "ϟ",
     tone: "energy",
   },
   {
     key: "nature",
     label: "Nature",
     shortLabel: "NAT",
+    icon: "⌁",
     tone: "nature",
   },
   {
     key: "happiness",
     label: "Bonheur",
     shortLabel: "BON",
+    icon: "☀",
     tone: "happiness",
   },
 ] as const;
+
+const TILE_PRESENTATION: Readonly<
+  Record<
+    string,
+    {
+      icon: string;
+      subtitle: string;
+      description: string;
+    }
+  >
+> = {
+  prairie: {
+    icon: "✿",
+    subtitle: "Milieu naturel",
+    description: "Une base douce pour développer la nature et le bien-être.",
+  },
+  forest: {
+    icon: "♠",
+    subtitle: "Milieu naturel",
+    description: "Renforce fortement la biodiversité du territoire.",
+  },
+  river: {
+    icon: "≈",
+    subtitle: "Réseau naturel",
+    description: "Une tuile orientable qui structure le futur réseau d'eau.",
+  },
+  field: {
+    icon: "≋",
+    subtitle: "Production agricole",
+    description: "Une production alimentaire efficace, mais plus intensive.",
+  },
+  orchard: {
+    icon: "●",
+    subtitle: "Production équilibrée",
+    description: "Produit de la nourriture tout en soutenant la nature.",
+  },
+  farm: {
+    icon: "⌂",
+    subtitle: "Pôle agricole",
+    description: "Une exploitation polyvalente au service de la commune.",
+  },
+};
 
 function formatResourceSummary(resources: TerritoryResources): string {
   return [
@@ -86,6 +133,31 @@ function createEmptyTerritorySummary(): TerritorySummaryChangedPayload {
     resources: createEmptyTerritoryResources(),
     placedTileCount: 0,
   };
+}
+
+function getPrimaryResourceTone(resources: TerritoryResources): ResourceTone {
+  let selectedTone: ResourceTone = "nature";
+  let selectedValue = Number.NEGATIVE_INFINITY;
+
+  for (const resource of RESOURCE_PRESENTATION) {
+    const value = resources[resource.key];
+
+    if (value > selectedValue) {
+      selectedValue = value;
+      selectedTone = resource.tone;
+    }
+  }
+
+  return selectedTone;
+}
+
+function getResourceEntries(resources: TerritoryResources) {
+  return RESOURCE_PRESENTATION.filter(
+    (resource) => resources[resource.key] !== 0,
+  ).map((resource) => ({
+    ...resource,
+    value: resources[resource.key],
+  }));
 }
 
 /**
@@ -126,30 +198,26 @@ export function App() {
       (scoreBreakdown.totalScore / PROTOTYPE_SCENARIO.targetScore) * 100,
     ),
   );
-  const turnProgress = Math.min(
-    100,
-    (turnState.number / PROTOTYPE_SCENARIO.maximumTurns) * 100,
-  );
 
   const phase = !turnState.placementCompleted
     ? {
         index: 1,
-        title: "Choisis et place une tuile",
+        title: "Choisis une tuile",
         description:
-          "Sélectionne une proposition, puis clique sur une case disponible de la carte.",
+          "Compare les trois propositions, puis place ton choix sur la carte.",
       }
     : !turnState.improvementCompleted
       ? {
           index: 2,
-          title: "Améliore ou valide le tour",
+          title: "Amélioration facultative",
           description:
-            "Choisis une amélioration compatible ou conserve l'état actuel de la commune.",
+            "Choisis une amélioration compatible ou termine directement le tour.",
         }
       : {
           index: 3,
-          title: "Le tour est prêt",
+          title: "Tour prêt",
           description:
-            "L'amélioration est installée. Tu peux maintenant passer au tour suivant.",
+            "Ton action est terminée. Tu peux maintenant passer au tour suivant.",
         };
 
   function clearSelections(): void {
@@ -194,60 +262,66 @@ export function App() {
           </div>
         </div>
 
-        <div className="scenario-identity">
+        <div className="commune-title">
           <span>Commune pilote</span>
           <strong>{PROTOTYPE_SCENARIO.label}</strong>
         </div>
 
-        <div className="topbar-progress" aria-label="Progression de la partie">
-          <div className="topbar-stat">
+        <dl className="header-resources" aria-label="Ressources de la commune">
+          {RESOURCE_PRESENTATION.map((resource) => (
+            <div
+              key={resource.key}
+              className={`header-resource header-resource--${resource.tone}`}
+            >
+              <dt>
+                <span aria-hidden="true">{resource.icon}</span>
+                {resource.label}
+              </dt>
+              <dd>{territorySummary.resources[resource.key]}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="header-progress" aria-label="Progression de la partie">
+          <div>
             <span>Tour</span>
             <strong>
               {turnState.number}
               <small> / {PROTOTYPE_SCENARIO.maximumTurns}</small>
             </strong>
-            <div className="mini-meter" aria-hidden="true">
-              <span style={{ width: `${turnProgress}%` }} />
-            </div>
           </div>
-
-          <div className="topbar-stat topbar-stat--score">
+          <div>
             <span>Score</span>
             <strong>
               {formatScore(scoreBreakdown.totalScore)}
               <small> / {formatScore(PROTOTYPE_SCENARIO.targetScore)}</small>
             </strong>
-            <div className="mini-meter" aria-hidden="true">
-              <span style={{ width: `${scoreProgress}%` }} />
-            </div>
           </div>
         </div>
       </header>
 
-      <section className="game-layout" aria-labelledby="scenario-title">
-        <aside className="status-panel panel-surface">
-          <div className="panel-heading">
+      <section className="game-layout">
+        <aside className="dashboard-panel">
+          <header>
             <p className="panel-kicker">Tableau de bord</p>
-            <h2 id="scenario-title">{PROTOTYPE_SCENARIO.label}</h2>
+            <h2>{PROTOTYPE_SCENARIO.label}</h2>
             <p>{PROTOTYPE_SCENARIO.description}</p>
-          </div>
+          </header>
 
-          <section className="status-section" aria-labelledby="resources-title">
-            <div className="section-title-row">
-              <h3 id="resources-title">Ressources</h3>
+          <section className="dashboard-section">
+            <div className="section-heading">
+              <h3>Ressources</h3>
               <span>{territorySummary.placedTileCount} tuiles</span>
             </div>
 
-            <dl className="resource-grid">
+            <dl className="dashboard-resources">
               {RESOURCE_PRESENTATION.map((resource) => (
                 <div
                   key={resource.key}
-                  className={`resource-card resource-card--${resource.tone}`}
+                  className={`dashboard-resource dashboard-resource--${resource.tone}`}
                 >
                   <dt>
-                    <span className="resource-card__badge" aria-hidden="true">
-                      {resource.shortLabel}
-                    </span>
+                    <span aria-hidden="true">{resource.icon}</span>
                     {resource.label}
                   </dt>
                   <dd>{territorySummary.resources[resource.key]}</dd>
@@ -256,22 +330,17 @@ export function App() {
             </dl>
           </section>
 
-          <section
-            className="status-section score-panel"
-            aria-labelledby="score-title"
-          >
-            <div className="section-title-row">
-              <h3 id="score-title">Objectif</h3>
+          <section className="dashboard-section dashboard-score">
+            <div className="section-heading">
+              <h3>Objectif</h3>
               <span>{Math.round(scoreProgress)} %</span>
             </div>
-
-            <div className="score-value-row">
-              <strong>{formatScore(scoreBreakdown.totalScore)}</strong>
-              <span>{formatScore(PROTOTYPE_SCENARIO.targetScore)} pts</span>
-            </div>
-
+            <strong>{formatScore(scoreBreakdown.totalScore)}</strong>
+            <small>
+              sur {formatScore(PROTOTYPE_SCENARIO.targetScore)} points
+            </small>
             <div
-              className="score-meter"
+              className="progress-meter"
               role="progressbar"
               aria-label="Progression vers l'objectif de score"
               aria-valuemin={0}
@@ -283,8 +352,7 @@ export function App() {
             >
               <span style={{ width: `${scoreProgress}%` }} />
             </div>
-
-            <div className="score-details">
+            <div className="score-split">
               <span>
                 Ressources
                 <strong>{formatScore(scoreBreakdown.resourceScore)}</strong>
@@ -296,30 +364,32 @@ export function App() {
             </div>
           </section>
 
-          <section className="status-section status-help">
+          <section className="dashboard-section dashboard-help">
             <h3>Repères</h3>
             <p>
-              Les contours violets signalent une synergie. Les contours orangés
-              indiquent les tuiles compatibles avec l'amélioration sélectionnée.
+              Les contours colorés indiquent les placements possibles, synergies
+              et améliorations compatibles.
             </p>
           </section>
         </aside>
 
-        <section className="map-panel">
+        <section className="map-panel" aria-labelledby="map-title">
           <header className="map-panel__header">
-            <div className="phase-indicator" aria-live="polite">
-              <span>Étape {phase.index}</span>
+            <div className="phase-summary">
+              <span>{phase.index}</span>
               <div>
-                <strong>{phase.title}</strong>
-                <p>{phase.description}</p>
+                <p>Étape en cours</p>
+                <strong id="map-title">{phase.title}</strong>
+                <small>{phase.description}</small>
               </div>
             </div>
 
-            <span
-              className={finalTurn ? "turn-chip turn-chip--final" : "turn-chip"}
-            >
-              {finalTurn ? "Dernier tour" : `Tour ${turnState.number}`}
-            </span>
+            <div className="map-badges">
+              <span>{territorySummary.placedTileCount} tuiles</span>
+              <span className={finalTurn ? "map-badge--final" : undefined}>
+                {finalTurn ? "Dernier tour" : `Tour ${turnState.number}`}
+              </span>
+            </div>
           </header>
 
           <div className="game-stage">
@@ -354,75 +424,50 @@ export function App() {
           </div>
         </section>
 
-        <aside className="action-panel panel-surface">
-          <header className="action-panel__header">
+        <aside className="actions-panel">
+          <header>
             <div>
               <p className="panel-kicker">Actions du tour</p>
               <h2>
                 {finalTurn ? "Derniers choix" : `Tour ${turnState.number}`}
               </h2>
             </div>
-            <span className="phase-number">{phase.index}/3</span>
+            <span>{phase.index}/3</span>
           </header>
 
-          <div className="action-panel__content">
-            <section
-              className="action-section"
-              aria-labelledby="proposals-title"
-            >
-              <div className="action-section__heading">
-                <span className="step-number">1</span>
+          <div className="actions-panel__body">
+            <section className="step-card">
+              <div className="step-card__heading">
+                <span>1</span>
                 <div>
-                  <h3 id="proposals-title">Choisir une tuile</h3>
-                  <p>Une seule proposition peut être placée ce tour-ci.</p>
+                  <strong>Choisir une tuile</strong>
+                  <small>Utilise les grandes cartes sous la map.</small>
                 </div>
               </div>
 
-              <div className="proposal-list">
-                {proposals.map((tileTypeId, proposalIndex) => {
-                  const definition = getTerritoryTileDefinition(tileTypeId);
-                  const resourceSummary = formatResourceSummary(
-                    definition.baseResources,
-                  );
-                  const isSelected = selectedTileTypeId === tileTypeId;
-
-                  return (
-                    <button
-                      key={`${turnState.number}:${proposalIndex}:${tileTypeId}`}
-                      type="button"
-                      className={
-                        isSelected
-                          ? "choice-button choice-button--active"
-                          : "choice-button"
-                      }
-                      aria-pressed={isSelected}
-                      disabled={
-                        interactionsDisabled || turnState.placementCompleted
-                      }
-                      onClick={() => {
-                        setSelectedTileTypeId(isSelected ? null : tileTypeId);
-                        setSelectedUpgradeTypeId(null);
-                        setSelectedTileRotation(0);
-                      }}
-                    >
-                      <span className="choice-button__index">
-                        {proposalIndex + 1}
-                      </span>
-                      <span className="choice-button__content">
-                        <strong>{definition.label}</strong>
-                        <small>{resourceSummary}</small>
-                      </span>
-                      <span className="choice-button__state" aria-hidden="true">
-                        {isSelected ? "Sélectionnée" : "Choisir"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              {selectedTileDefinition === null ? (
+                <p className="selection-placeholder">
+                  Aucune proposition sélectionnée.
+                </p>
+              ) : (
+                <div className="selected-tile-summary">
+                  <span aria-hidden="true">
+                    {TILE_PRESENTATION[selectedTileTypeId ?? ""]?.icon ?? "⬡"}
+                  </span>
+                  <div>
+                    <strong>{selectedTileDefinition.label}</strong>
+                    <small>
+                      {formatResourceSummary(
+                        selectedTileDefinition.baseResources,
+                      )}
+                    </small>
+                  </div>
+                </div>
+              )}
 
               <button
                 type="button"
-                className="secondary-button"
+                className="secondary-action"
                 disabled={
                   interactionsDisabled ||
                   turnState.placementCompleted ||
@@ -434,29 +479,24 @@ export function App() {
                   );
                 }}
               >
+                <span aria-hidden="true">↻</span>
                 <span>
                   <strong>Tourner la tuile</strong>
                   <small>
-                    {selectedTileDefinition === null
-                      ? "Disponible sur les tuiles orientables"
-                      : `${selectedTileDefinition.label} · position ${selectedTileRotation + 1}/6`}
+                    {rotationEnabled
+                      ? `Position ${selectedTileRotation + 1}/6`
+                      : "Disponible pour les tuiles orientables"}
                   </small>
-                </span>
-                <span className="rotation-symbol" aria-hidden="true">
-                  ↻
                 </span>
               </button>
             </section>
 
-            <section
-              className="action-section"
-              aria-labelledby="upgrades-title"
-            >
-              <div className="action-section__heading">
-                <span className="step-number">2</span>
+            <section className="step-card step-card--upgrades">
+              <div className="step-card__heading">
+                <span>2</span>
                 <div>
-                  <h3 id="upgrades-title">Amélioration facultative</h3>
-                  <p>Disponible après le placement de la tuile.</p>
+                  <strong>Amélioration facultative</strong>
+                  <small>Disponible après le placement.</small>
                 </div>
               </div>
 
@@ -465,16 +505,15 @@ export function App() {
                   const definition =
                     getTerritoryUpgradeDefinition(upgradeTypeId);
                   const isSelected = selectedUpgradeTypeId === upgradeTypeId;
+                  const tone = getPrimaryResourceTone(definition.resourceBonus);
 
                   return (
                     <button
                       key={upgradeTypeId}
                       type="button"
-                      className={
-                        isSelected
-                          ? "upgrade-button upgrade-button--active"
-                          : "upgrade-button"
-                      }
+                      className={`upgrade-action upgrade-action--${tone}${
+                        isSelected ? " upgrade-action--selected" : ""
+                      }`}
                       aria-pressed={isSelected}
                       disabled={
                         interactionsDisabled ||
@@ -489,12 +528,21 @@ export function App() {
                         setSelectedTileRotation(0);
                       }}
                     >
+                      <span aria-hidden="true">
+                        {tone === "food"
+                          ? "✦"
+                          : tone === "energy"
+                            ? "ϟ"
+                            : tone === "happiness"
+                              ? "☀"
+                              : "⌁"}
+                      </span>
                       <span>
                         <strong>{definition.label}</strong>
-                        <small>{definition.targetLabel}</small>
-                      </span>
-                      <span className="upgrade-button__bonus">
-                        {formatResourceSummary(definition.resourceBonus)}
+                        <small>
+                          {definition.targetLabel} ·{" "}
+                          {formatResourceSummary(definition.resourceBonus)}
+                        </small>
                       </span>
                     </button>
                   );
@@ -503,9 +551,9 @@ export function App() {
             </section>
           </div>
 
-          <footer className="action-panel__footer">
-            <div>
-              <span className="step-number">3</span>
+          <footer>
+            <div className="finish-copy">
+              <span>3</span>
               <p>
                 {turnState.placementCompleted
                   ? "Le tour peut être validé."
@@ -519,9 +567,103 @@ export function App() {
               onClick={handleEndTurn}
             >
               {finalTurn ? "Voir le bilan" : "Terminer le tour"}
+              <span aria-hidden="true">→</span>
             </button>
           </footer>
         </aside>
+
+        <section className="proposal-deck" aria-labelledby="proposals-title">
+          <header className="proposal-deck__header">
+            <div>
+              <p className="panel-kicker">Propositions de tuiles</p>
+              <h2 id="proposals-title">
+                Choisis la prochaine évolution de la commune
+              </h2>
+            </div>
+            <p>
+              Compare les effets, sélectionne une carte, puis place-la sur une
+              case valide.
+            </p>
+          </header>
+
+          <div className="proposal-grid">
+            {proposals.map((tileTypeId, proposalIndex) => {
+              const definition = getTerritoryTileDefinition(tileTypeId);
+              const presentation = TILE_PRESENTATION[tileTypeId] ?? {
+                icon: "⬡",
+                subtitle: "Tuile",
+                description: "Une nouvelle possibilité pour la commune.",
+              };
+              const resourceEntries = getResourceEntries(
+                definition.baseResources,
+              );
+              const isSelected = selectedTileTypeId === tileTypeId;
+
+              return (
+                <button
+                  key={`${turnState.number}:${proposalIndex}:${tileTypeId}`}
+                  type="button"
+                  className={`proposal-card proposal-card--${tileTypeId}${
+                    isSelected ? " proposal-card--selected" : ""
+                  }`}
+                  aria-pressed={isSelected}
+                  disabled={
+                    interactionsDisabled || turnState.placementCompleted
+                  }
+                  onClick={() => {
+                    setSelectedTileTypeId(isSelected ? null : tileTypeId);
+                    setSelectedUpgradeTypeId(null);
+                    setSelectedTileRotation(0);
+                  }}
+                >
+                  <span className="proposal-card__number">
+                    {proposalIndex + 1}
+                  </span>
+                  {isSelected ? (
+                    <span className="proposal-card__selected">
+                      ✓ Sélectionnée
+                    </span>
+                  ) : null}
+
+                  <span className="proposal-card__visual" aria-hidden="true">
+                    <span>{presentation.icon}</span>
+                  </span>
+
+                  <span className="proposal-card__body">
+                    <span className="proposal-card__type">
+                      {presentation.subtitle}
+                    </span>
+                    <strong>{definition.label}</strong>
+                    <small>{presentation.description}</small>
+                  </span>
+
+                  <span className="proposal-card__effects">
+                    <span>Effets immédiats</span>
+                    <span className="proposal-card__resources">
+                      {resourceEntries.map((resource) => (
+                        <span
+                          key={resource.key}
+                          className={`proposal-resource proposal-resource--${resource.tone}`}
+                        >
+                          <span aria-hidden="true">{resource.icon}</span>
+                          <small>{resource.label}</small>
+                          <strong>
+                            {resource.value > 0 ? "+" : ""}
+                            {resource.value}
+                          </strong>
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+
+                  <span className="proposal-card__cta">
+                    {isSelected ? "Tuile sélectionnée" : "Choisir cette tuile"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
       </section>
 
       {gameCompleted ? (

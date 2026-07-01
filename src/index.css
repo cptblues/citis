@@ -30,13 +30,13 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(circle at 15% 0%, rgb(255 255 255 / 68%), transparent 34%),
+    radial-gradient(circle at 12% 0%, rgb(255 255 255 / 72%), transparent 32%),
     radial-gradient(
-      circle at 88% 100%,
-      rgb(191 211 181 / 48%),
+      circle at 90% 100%,
+      rgb(183 208 173 / 52%),
       transparent 38%
     ),
-    #e8eee5;
+    linear-gradient(135deg, #edf2e9, #dfe9dd);
 }
 
 button,
@@ -47,8 +47,8 @@ textarea {
 }
 
 button:focus-visible {
-  outline: 3px solid rgb(76 116 82 / 34%);
-  outline-offset: 2px;
+  outline: 3px solid rgb(52 126 192 / 32%);
+  outline-offset: 3px;
 }
 
 #root {
