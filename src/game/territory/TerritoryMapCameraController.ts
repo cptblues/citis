@@ -8,12 +8,14 @@ import {
 
 export const TERRITORY_MAP_CONTAINER_NAME = "territory-map-container";
 
-const DEFAULT_INITIAL_ZOOM = 1.08;
-const INITIAL_ZOOM_LIMIT = 1.35;
+const INITIAL_ZOOM_MULTIPLIER = 1.18;
+const INITIAL_ZOOM_LIMIT = 1.22;
+const BUTTON_ZOOM_FACTOR = 1.16;
 const MAXIMUM_ZOOM = 2.25;
 const DRAG_THRESHOLD = 8;
 const WHEEL_ZOOM_SENSITIVITY = 0.00135;
 const MAXIMUM_WHEEL_DELTA = 160;
+const ZOOM_EPSILON = 0.0005;
 
 interface TerritoryMapCameraControllerOptions {
   scene: Phaser.Scene;
@@ -60,6 +62,7 @@ export class TerritoryMapCameraController {
   private readonly mapContainer: Phaser.GameObjects.Container;
   private readonly viewport: Phaser.Geom.Rectangle;
   private readonly contentBounds: Phaser.Geom.Rectangle;
+  private readonly initialFocusPoint: Phaser.Math.Vector2;
   private readonly canPanWithPrimaryPointer: () => boolean;
   private readonly onCellClick: (cellId: string) => void;
   private readonly onViewInteraction: () => void;
@@ -68,6 +71,7 @@ export class TerritoryMapCameraController {
   private interaction: PointerInteraction | null = null;
   private minimumZoom = 1;
   private maximumZoom = MAXIMUM_ZOOM;
+  private fitViewActive = false;
   private destroyed = false;
 
   public constructor(options: TerritoryMapCameraControllerOptions) {
@@ -75,6 +79,7 @@ export class TerritoryMapCameraController {
     this.mapContainer = options.mapContainer;
     this.viewport = Phaser.Geom.Rectangle.Clone(options.viewport);
     this.contentBounds = Phaser.Geom.Rectangle.Clone(options.contentBounds);
+    this.initialFocusPoint = options.focusPoint.clone();
     this.canPanWithPrimaryPointer = options.canPanWithPrimaryPointer;
     this.onCellClick = options.onCellClick;
     this.onViewInteraction = options.onViewInteraction;
@@ -84,11 +89,31 @@ export class TerritoryMapCameraController {
 
     this.recalculateZoomLimits();
     this.bindInputEvents();
-    this.resetView(options.focusPoint);
+    this.resetView();
   }
 
   public isDragging(): boolean {
     return this.interaction?.dragging === true;
+  }
+
+  public zoomIn(): void {
+    this.zoomAroundViewportCenter(BUTTON_ZOOM_FACTOR);
+  }
+
+  public zoomOut(): void {
+    this.zoomAroundViewportCenter(1 / BUTTON_ZOOM_FACTOR);
+  }
+
+  /** Affiche le territoire entier avec sa marge de sécurité. */
+  public fitView(): void {
+    if (this.destroyed) {
+      return;
+    }
+
+    this.onViewInteraction();
+    this.clearPointerInteraction();
+    this.fitViewActive = true;
+    this.applyFitView();
   }
 
   public registerCellPointerDown(
@@ -122,7 +147,7 @@ export class TerritoryMapCameraController {
   }
 
   public updateViewport(viewport: Phaser.Geom.Rectangle): void {
-    const currentScale = this.mapContainer.scaleX;
+    const currentScale = Math.max(this.mapContainer.scaleX, ZOOM_EPSILON);
     const currentViewportCenter = new Phaser.Math.Vector2(
       this.viewport.centerX,
       this.viewport.centerY,
@@ -139,6 +164,12 @@ export class TerritoryMapCameraController {
       viewport.height,
     );
     this.recalculateZoomLimits();
+
+    if (this.fitViewActive) {
+      this.applyFitView();
+      this.refreshCursor();
+      return;
+    }
 
     const nextScale = Phaser.Math.Clamp(
       currentScale,
@@ -243,6 +274,7 @@ export class TerritoryMapCameraController {
 
       if (interaction.allowPan) {
         interaction.dragging = true;
+        this.fitViewActive = false;
         this.onViewInteraction();
         this.scene.input.setDefaultCursor("grabbing");
       }
@@ -301,23 +333,7 @@ export class TerritoryMapCameraController {
       this.maximumZoom,
     );
 
-    if (Math.abs(nextScale - previousScale) < 0.0005) {
-      return;
-    }
-
-    this.onViewInteraction();
-
-    const nextPosition = zoomMapPositionAroundPoint(
-      this.mapContainer,
-      previousScale,
-      nextScale,
-      pointer,
-    );
-
-    this.mapContainer.setScale(nextScale);
-    this.mapContainer.setPosition(nextPosition.x, nextPosition.y);
-    this.clampCurrentPosition();
-    this.refreshCursor();
+    this.applyZoomAroundPoint(pointer, previousScale, nextScale);
   };
 
   private readonly handleSpaceKeyChanged = (): void => {
@@ -391,19 +407,89 @@ export class TerritoryMapCameraController {
     this.refreshCursor();
   }
 
-  private resetView(focusPoint: Phaser.Math.Vector2): void {
+  private resetView(): void {
     const requestedZoom = Math.min(
       INITIAL_ZOOM_LIMIT,
-      Math.max(DEFAULT_INITIAL_ZOOM, this.minimumZoom * 1.55),
+      this.minimumZoom * INITIAL_ZOOM_MULTIPLIER,
     );
     const scale = Phaser.Math.Clamp(
       requestedZoom,
       this.minimumZoom,
       this.maximumZoom,
     );
-    const position = centerMapPointInViewport(focusPoint, scale, this.viewport);
+    const position = centerMapPointInViewport(
+      this.initialFocusPoint,
+      scale,
+      this.viewport,
+    );
 
+    this.fitViewActive = false;
     this.mapContainer.setScale(scale);
+    this.mapContainer.setPosition(position.x, position.y);
+    this.clampCurrentPosition();
+  }
+
+  private zoomAroundViewportCenter(factor: number): void {
+    if (this.destroyed) {
+      return;
+    }
+
+    const previousScale = this.mapContainer.scaleX;
+    const nextScale = Phaser.Math.Clamp(
+      previousScale * factor,
+      this.minimumZoom,
+      this.maximumZoom,
+    );
+    const anchor = new Phaser.Math.Vector2(
+      this.viewport.centerX,
+      this.viewport.centerY,
+    );
+
+    this.applyZoomAroundPoint(anchor, previousScale, nextScale);
+  }
+
+  private applyZoomAroundPoint(
+    anchor: Phaser.Types.Math.Vector2Like,
+    previousScale: number,
+    nextScale: number,
+  ): void {
+    if (Math.abs(nextScale - previousScale) < ZOOM_EPSILON) {
+      return;
+    }
+
+    if (nextScale <= this.minimumZoom + ZOOM_EPSILON) {
+      this.fitView();
+      return;
+    }
+
+    this.fitViewActive = false;
+    this.onViewInteraction();
+
+    const nextPosition = zoomMapPositionAroundPoint(
+      this.mapContainer,
+      previousScale,
+      nextScale,
+      anchor,
+    );
+
+    this.mapContainer.setScale(nextScale);
+    this.mapContainer.setPosition(nextPosition.x, nextPosition.y);
+    this.clampCurrentPosition();
+    this.refreshCursor();
+  }
+
+  private applyFitView(): void {
+    const center = new Phaser.Math.Vector2(
+      this.contentBounds.centerX,
+      this.contentBounds.centerY,
+    );
+    const position = centerMapPointInViewport(
+      center,
+      this.minimumZoom,
+      this.viewport,
+    );
+
+    this.mapContainer.setScale(this.minimumZoom);
     this.mapContainer.setPosition(position.x, position.y);
     this.clampCurrentPosition();
   }

@@ -9,9 +9,7 @@ import type { TerritoryResources } from "../engine/resources";
 export const SET_SELECTED_TILE_TYPE_EVENT = "citis:set-selected-tile-type";
 export type SelectedTileTypeId = PrototypePlaceableTileTypeId | null;
 
-/**
- * Événement envoyé par React pour autoriser ou bloquer le placement.
- */
+/** Événement envoyé par React pour autoriser ou bloquer le placement. */
 export const SET_PLACEMENT_ENABLED_EVENT = "citis:set-placement-enabled";
 
 /**
@@ -38,6 +36,11 @@ export interface TerritoryUpgradeAppliedPayload {
 export const SET_SELECTED_TILE_ROTATION_EVENT =
   "citis:set-selected-tile-rotation";
 
+/** Commandes React vers la caméra interne du territoire. */
+export const TERRITORY_MAP_ZOOM_IN_EVENT = "citis:territory-map-zoom-in";
+export const TERRITORY_MAP_ZOOM_OUT_EVENT = "citis:territory-map-zoom-out";
+export const TERRITORY_MAP_FIT_EVENT = "citis:territory-map-fit";
+
 /**
  * Résumé émis par la scène après chaque changement de ressources.
  */
@@ -55,12 +58,10 @@ export interface TerritorySummaryChangedPayload {
  */
 export const TERRITORY_PLACEMENT_PREVIEW_CHANGED_EVENT =
   "citis:territory-placement-preview-changed";
-
 export interface TerritoryPlacementPreviewPayload {
   valid: boolean;
   message: string;
   synergyLabels: readonly string[];
 }
-
 export type TerritoryPlacementPreviewChangedPayload =
   TerritoryPlacementPreviewPayload | null;

@@ -16,7 +16,13 @@ import {
   type HexSide,
 } from "../../engine/hex";
 import { canApplyTerritoryUpgrade } from "../../engine/upgrades";
-import type { SelectedTileTypeId, SelectedUpgradeTypeId } from "../gameEvents";
+import {
+  TERRITORY_MAP_FIT_EVENT,
+  TERRITORY_MAP_ZOOM_IN_EVENT,
+  TERRITORY_MAP_ZOOM_OUT_EVENT,
+  type SelectedTileTypeId,
+  type SelectedUpgradeTypeId,
+} from "../gameEvents";
 import { createTerritoryTileContent } from "../rendering/territoryTileContent";
 import {
   TERRITORY_MAP_CONTAINER_NAME,
@@ -24,7 +30,7 @@ import {
 } from "./TerritoryMapCameraController";
 
 const BOARD_HORIZONTAL_MARGIN = 28;
-const BOARD_TOP = 184;
+const BOARD_TOP_MARGIN = 18;
 const BOARD_BOTTOM_MARGIN = 14;
 const NATURAL_HEX_SIZE = 54;
 const TILE_CONTENT_REFERENCE_SIZE = 62;
@@ -181,8 +187,20 @@ export class TerritoryBoardView {
       },
     });
 
+    this.scene.game.events.on(TERRITORY_MAP_ZOOM_IN_EVENT, this.handleZoomIn);
+    this.scene.game.events.on(TERRITORY_MAP_ZOOM_OUT_EVENT, this.handleZoomOut);
+    this.scene.game.events.on(TERRITORY_MAP_FIT_EVENT, this.handleFitMap);
     this.scene.scale.on("resize", this.handleScaleResize);
     this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scene.game.events.off(
+        TERRITORY_MAP_ZOOM_IN_EVENT,
+        this.handleZoomIn,
+      );
+      this.scene.game.events.off(
+        TERRITORY_MAP_ZOOM_OUT_EVENT,
+        this.handleZoomOut,
+      );
+      this.scene.game.events.off(TERRITORY_MAP_FIT_EVENT, this.handleFitMap);
       this.scene.scale.off("resize", this.handleScaleResize);
       this.mapContainer.clearMask(true);
       this.maskGraphics.destroy();
@@ -219,6 +237,18 @@ export class TerritoryBoardView {
           graphics !== undefined,
       );
   }
+
+  private readonly handleZoomIn = (): void => {
+    this.cameraController.zoomIn();
+  };
+
+  private readonly handleZoomOut = (): void => {
+    this.cameraController.zoomOut();
+  };
+
+  private readonly handleFitMap = (): void => {
+    this.cameraController.fitView();
+  };
 
   private readonly handleScaleResize = (): void => {
     this.viewport = createBoardViewport(
@@ -635,7 +665,10 @@ function createBoardViewport(
     BOARD_HORIZONTAL_MARGIN,
     Math.max(12, sceneWidth * 0.03),
   );
-  const top = Math.min(BOARD_TOP, Math.max(104, sceneHeight * 0.29));
+  const top = Math.min(
+    BOARD_TOP_MARGIN,
+    Math.max(10, sceneHeight * 0.03),
+  );
   const bottomMargin = Math.min(
     BOARD_BOTTOM_MARGIN,
     Math.max(8, sceneHeight * 0.02),

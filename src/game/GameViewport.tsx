@@ -1,7 +1,5 @@
 import { useEffect, useRef } from "react";
-
 import Phaser from "phaser";
-
 import type { HexRotation } from "../engine/hex";
 import { createPhaserGame } from "./createPhaserGame";
 import {
@@ -10,32 +8,23 @@ import {
   SET_SELECTED_TILE_ROTATION_EVENT,
   SET_SELECTED_TILE_TYPE_EVENT,
   SET_SELECTED_UPGRADE_TYPE_EVENT,
+  TERRITORY_MAP_FIT_EVENT,
+  TERRITORY_MAP_ZOOM_IN_EVENT,
+  TERRITORY_MAP_ZOOM_OUT_EVENT,
+  TERRITORY_PLACEMENT_PREVIEW_CHANGED_EVENT,
   TERRITORY_SUMMARY_CHANGED_EVENT,
   TERRITORY_TILE_PLACED_EVENT,
   TERRITORY_UPGRADE_APPLIED_EVENT,
   type SelectedTileTypeId,
   type SelectedUpgradeTypeId,
+  type TerritoryPlacementPreviewChangedPayload,
   type TerritorySummaryChangedPayload,
   type TerritoryTilePlacedPayload,
   type TerritoryUpgradeAppliedPayload,
-  TERRITORY_PLACEMENT_PREVIEW_CHANGED_EVENT,
-  type TerritoryPlacementPreviewChangedPayload,
 } from "./gameEvents";
 import "./GameViewport.css";
 
 const TERRITORY_SCENE_KEY = "TerritoryPrototypeScene";
-
-const BOARD_FRAME = {
-  centerX: 480,
-  centerY: 350,
-  width: 820,
-  height: 540,
-} as const;
-
-const CAMERA_FIT_MARGIN = 0.94;
-const MIN_ZOOM_MULTIPLIER = 0.8;
-const MAX_ZOOM_MULTIPLIER = 2;
-const ZOOM_STEP = 0.15;
 
 interface GameViewportProps {
   selectedTileTypeId: SelectedTileTypeId;
@@ -51,10 +40,6 @@ interface GameViewportProps {
   ) => void;
 }
 
-function clampZoomMultiplier(value: number): number {
-  return Phaser.Math.Clamp(value, MIN_ZOOM_MULTIPLIER, MAX_ZOOM_MULTIPLIER);
-}
-
 function getTerritoryScene(game: Phaser.Game): Phaser.Scene | null {
   if (!game.scene.isActive(TERRITORY_SCENE_KEY)) {
     return null;
@@ -64,9 +49,9 @@ function getTerritoryScene(game: Phaser.Game): Phaser.Scene | null {
 }
 
 /**
- * Les textes permanents de l'ancienne scène faisaient doublon avec le HUD
- * React. Ils sont masqués une fois la scène créée. Les feedbacks temporaires
- * générés plus tard après un placement restent visibles.
+ * Les textes permanents de l'ancienne scène font doublon avec le HUD React.
+ * Ils sont masqués une fois la scène créée. Les feedbacks temporaires générés
+ * après un placement restent visibles.
  */
 function hideInitialSceneTexts(scene: Phaser.Scene): void {
   for (const gameObject of scene.children.list) {
@@ -76,29 +61,13 @@ function hideInitialSceneTexts(scene: Phaser.Scene): void {
   }
 }
 
-function frameTerritoryCamera(game: Phaser.Game, zoomMultiplier: number): void {
-  const scene = getTerritoryScene(game);
-
-  if (scene === null) {
-    return;
-  }
-
-  const viewportWidth = Math.max(game.scale.gameSize.width, 1);
-  const viewportHeight = Math.max(game.scale.gameSize.height, 1);
-  const fitZoom =
-    Math.min(
-      viewportWidth / BOARD_FRAME.width,
-      viewportHeight / BOARD_FRAME.height,
-    ) * CAMERA_FIT_MARGIN;
-
-  scene.cameras.main
-    .setZoom(fitZoom * zoomMultiplier)
-    .centerOn(BOARD_FRAME.centerX, BOARD_FRAME.centerY);
-}
-
 /**
  * Monte la scène Phaser dans React, relaie les événements de gameplay et
- * fournit les contrôles de caméra de la carte.
+ * transmet les commandes de caméra au contrôleur interne de la carte.
+ *
+ * La caméra principale Phaser reste volontairement à son zoom natif. Le zoom
+ * et le déplacement sont appliqués uniquement au conteneur de territoire afin
+ * que le masque, les zones interactives et les propositions restent alignés.
  */
 export function GameViewport({
   selectedTileTypeId,
@@ -113,7 +82,6 @@ export function GameViewport({
 }: GameViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
-  const zoomMultiplierRef = useRef(1);
   const onTilePlacedRef = useRef(onTilePlaced);
   const onUpgradeAppliedRef = useRef(onUpgradeApplied);
   const onTerritorySummaryChangedRef = useRef(onTerritorySummaryChanged);
@@ -132,37 +100,23 @@ export function GameViewport({
     const handleTilePlaced = (payload: TerritoryTilePlacedPayload): void => {
       onTilePlacedRef.current(payload);
     };
-
     const handleUpgradeApplied = (
       payload: TerritoryUpgradeAppliedPayload,
     ): void => {
       onUpgradeAppliedRef.current(payload);
     };
-
     const handleTerritorySummaryChanged = (
       payload: TerritorySummaryChangedPayload,
     ): void => {
       onTerritorySummaryChangedRef.current(payload);
     };
-
     const handlePlacementPreviewChanged = (
       payload: TerritoryPlacementPreviewChangedPayload,
     ): void => {
       onPlacementPreviewChangedRef.current(payload);
     };
 
-    const handleWheel = (event: WheelEvent): void => {
-      event.preventDefault();
-
-      const direction = event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
-      zoomMultiplierRef.current = clampZoomMultiplier(
-        zoomMultiplierRef.current + direction,
-      );
-      frameTerritoryCamera(game, zoomMultiplierRef.current);
-    };
-
     let initializationFrame = 0;
-    let resizeFrame = 0;
 
     const initializeSceneView = (): void => {
       const scene = getTerritoryScene(game);
@@ -173,7 +127,6 @@ export function GameViewport({
       }
 
       hideInitialSceneTexts(scene);
-      frameTerritoryCamera(game, zoomMultiplierRef.current);
     };
 
     const resizeObserver = new ResizeObserver(([entry]) => {
@@ -189,10 +142,6 @@ export function GameViewport({
       }
 
       game.scale.resize(width, height);
-      window.cancelAnimationFrame(resizeFrame);
-      resizeFrame = window.requestAnimationFrame(() => {
-        frameTerritoryCamera(game, zoomMultiplierRef.current);
-      });
     });
 
     game.events.on(TERRITORY_TILE_PLACED_EVENT, handleTilePlaced);
@@ -205,15 +154,13 @@ export function GameViewport({
       TERRITORY_PLACEMENT_PREVIEW_CHANGED_EVENT,
       handlePlacementPreviewChanged,
     );
-    container.addEventListener("wheel", handleWheel, { passive: false });
+
     resizeObserver.observe(container);
     initializationFrame = window.requestAnimationFrame(initializeSceneView);
 
     return () => {
       window.cancelAnimationFrame(initializationFrame);
-      window.cancelAnimationFrame(resizeFrame);
       resizeObserver.disconnect();
-      container.removeEventListener("wheel", handleWheel);
       game.events.off(TERRITORY_TILE_PLACED_EVENT, handleTilePlaced);
       game.events.off(TERRITORY_UPGRADE_APPLIED_EVENT, handleUpgradeApplied);
       game.events.off(
@@ -295,26 +242,8 @@ export function GameViewport({
     game.events.emit(SET_SELECTED_TILE_ROTATION_EVENT, selectedTileRotation);
   }, [selectedTileRotation]);
 
-  function changeZoom(delta: number): void {
-    zoomMultiplierRef.current = clampZoomMultiplier(
-      zoomMultiplierRef.current + delta,
-    );
-
-    const game = gameRef.current;
-
-    if (game !== null) {
-      frameTerritoryCamera(game, zoomMultiplierRef.current);
-    }
-  }
-
-  function resetZoom(): void {
-    zoomMultiplierRef.current = 1;
-
-    const game = gameRef.current;
-
-    if (game !== null) {
-      frameTerritoryCamera(game, zoomMultiplierRef.current);
-    }
+  function emitMapControl(eventName: string): void {
+    gameRef.current?.events.emit(eventName);
   }
 
   return (
@@ -329,25 +258,27 @@ export function GameViewport({
         <button
           type="button"
           className="map-zoom-button"
-          onClick={() => changeZoom(-ZOOM_STEP)}
+          onClick={() => emitMapControl(TERRITORY_MAP_ZOOM_OUT_EVENT)}
           aria-label="Dézoomer"
           title="Dézoomer"
         >
           −
         </button>
+
         <button
           type="button"
           className="map-zoom-button map-zoom-button--reset"
-          onClick={resetZoom}
-          aria-label="Recentrer la carte"
-          title="Recentrer la carte"
+          onClick={() => emitMapControl(TERRITORY_MAP_FIT_EVENT)}
+          aria-label="Afficher toute la carte"
+          title="Afficher toute la carte"
         >
           ◎
         </button>
+
         <button
           type="button"
           className="map-zoom-button"
-          onClick={() => changeZoom(ZOOM_STEP)}
+          onClick={() => emitMapControl(TERRITORY_MAP_ZOOM_IN_EVENT)}
           aria-label="Zoomer"
           title="Zoomer"
         >
