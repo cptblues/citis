@@ -175,7 +175,7 @@ p {
     minmax(245px, 285px);
   grid-template-rows:
     minmax(360px, 1fr)
-    clamp(250px, 31vh, 330px);
+    clamp(270px, 31vh, 330px);
   gap: 10px;
   height: calc(100svh - 106px);
   margin-top: 10px;
@@ -435,7 +435,7 @@ p {
   background: #dfe8dd;
 }
 
-.game-stage > * {
+.game-stage > :first-child {
   width: 100%;
   height: 100%;
 }
@@ -708,12 +708,15 @@ p {
 
 .proposal-deck {
   grid-area: proposals;
+  display: flex;
   min-height: 0;
+  flex-direction: column;
   padding: 12px;
 }
 
 .proposal-deck__header {
   display: flex;
+  flex: 0 0 auto;
   align-items: end;
   justify-content: space-between;
   gap: 18px;
@@ -729,17 +732,21 @@ p {
 
 .proposal-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  height: calc(100% - 58px);
+  grid-template-columns: repeat(3, minmax(245px, 1fr));
+  flex: 1 1 auto;
   min-height: 0;
   gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .proposal-card {
   position: relative;
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
+  grid-template-columns: clamp(86px, 34%, 112px) minmax(0, 1fr);
   grid-template-rows: auto 1fr auto;
+  container-type: inline-size;
   min-height: 0;
   height: 100%;
   overflow: hidden;
@@ -789,12 +796,16 @@ p {
   top: 0;
   right: 0;
   z-index: 3;
+  max-width: calc(100% - 48px);
+  overflow: hidden;
   padding: 7px 10px;
   border-radius: 0 15px 0 12px;
   color: #fff;
   background: #2876b7;
   font-size: 0.68rem;
   font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .proposal-card__visual {
@@ -819,7 +830,9 @@ p {
 
 .proposal-card__body {
   display: flex;
+  min-height: 0;
   flex-direction: column;
+  overflow: hidden;
   padding: 15px 14px 5px;
 }
 
@@ -834,12 +847,17 @@ p {
 .proposal-card__body > strong {
   margin-top: 3px;
   font-size: 1.25rem;
+  line-height: 1.08;
 }
 
 .proposal-card__body > small {
+  display: -webkit-box;
+  overflow: hidden;
   margin-top: 5px;
   color: var(--ink-500);
   font-size: 0.68rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   line-height: 1.35;
 }
 
@@ -965,6 +983,10 @@ p {
     0 18px 42px rgb(42 106 164 / 25%);
 }
 
+.proposal-card--selected .proposal-card__body {
+  padding-top: 30px;
+}
+
 .proposal-card--selected .proposal-card__cta {
   background: linear-gradient(135deg, #347fc3, #2768a7);
 }
@@ -1066,6 +1088,17 @@ p {
   margin-top: 18px;
 }
 
+@media (max-width: 1500px) {
+  .proposal-deck__header {
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .proposal-deck__header p:last-child {
+    display: none;
+  }
+}
+
 @media (max-width: 1320px) {
   .topbar {
     grid-template-columns: auto minmax(360px, 1fr) auto;
@@ -1082,7 +1115,7 @@ p {
       minmax(235px, 260px);
     grid-template-rows:
       minmax(340px, 1fr)
-      clamp(245px, 30vh, 310px);
+      clamp(270px, 30vh, 310px);
   }
 
   .proposal-card {
@@ -1293,7 +1326,7 @@ p {
 .placement-preview-banner {
   position: absolute;
   z-index: 8;
-  left: 50%;
+  left: 30%;
   bottom: 18px;
   display: flex;
   width: min(520px, calc(100% - 150px));
@@ -1308,6 +1341,8 @@ p {
   backdrop-filter: blur(9px);
   pointer-events: none;
   transform: translateX(-50%);
+  height: auto;
+  min-height: 0;
 }
 
 .placement-preview-banner--invalid {
@@ -1437,6 +1472,28 @@ p {
   content: "Sélection active";
   color: #2f73ae;
   opacity: 1;
+}
+
+@container (max-width: 300px) {
+  .proposal-card__body {
+    padding-inline: 12px;
+  }
+
+  .proposal-card__body > strong {
+    font-size: 1.1rem;
+  }
+
+  .proposal-card__body > small {
+    -webkit-line-clamp: 2;
+  }
+
+  .proposal-card__resources {
+    grid-template-columns: 1fr;
+  }
+
+  .proposal-resource {
+    padding: 6px 8px;
+  }
 }
 
 @media (max-width: 760px) {
