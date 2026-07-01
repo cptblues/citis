@@ -18,6 +18,8 @@ import {
   type TerritorySummaryChangedPayload,
   type TerritoryTilePlacedPayload,
   type TerritoryUpgradeAppliedPayload,
+  TERRITORY_PLACEMENT_PREVIEW_CHANGED_EVENT,
+  type TerritoryPlacementPreviewChangedPayload,
 } from "./gameEvents";
 import "./GameViewport.css";
 
@@ -44,6 +46,9 @@ interface GameViewportProps {
   onUpgradeApplied: (payload: TerritoryUpgradeAppliedPayload) => void;
   selectedTileRotation: HexRotation;
   onTerritorySummaryChanged: (payload: TerritorySummaryChangedPayload) => void;
+  onPlacementPreviewChanged: (
+    payload: TerritoryPlacementPreviewChangedPayload,
+  ) => void;
 }
 
 function clampZoomMultiplier(value: number): number {
@@ -104,6 +109,7 @@ export function GameViewport({
   onUpgradeApplied,
   selectedTileRotation,
   onTerritorySummaryChanged,
+  onPlacementPreviewChanged,
 }: GameViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
@@ -111,6 +117,7 @@ export function GameViewport({
   const onTilePlacedRef = useRef(onTilePlaced);
   const onUpgradeAppliedRef = useRef(onUpgradeApplied);
   const onTerritorySummaryChangedRef = useRef(onTerritorySummaryChanged);
+  const onPlacementPreviewChangedRef = useRef(onPlacementPreviewChanged);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -136,6 +143,12 @@ export function GameViewport({
       payload: TerritorySummaryChangedPayload,
     ): void => {
       onTerritorySummaryChangedRef.current(payload);
+    };
+
+    const handlePlacementPreviewChanged = (
+      payload: TerritoryPlacementPreviewChangedPayload,
+    ): void => {
+      onPlacementPreviewChangedRef.current(payload);
     };
 
     const handleWheel = (event: WheelEvent): void => {
@@ -188,6 +201,10 @@ export function GameViewport({
       TERRITORY_SUMMARY_CHANGED_EVENT,
       handleTerritorySummaryChanged,
     );
+    game.events.on(
+      TERRITORY_PLACEMENT_PREVIEW_CHANGED_EVENT,
+      handlePlacementPreviewChanged,
+    );
     container.addEventListener("wheel", handleWheel, { passive: false });
     resizeObserver.observe(container);
     initializationFrame = window.requestAnimationFrame(initializeSceneView);
@@ -202,6 +219,10 @@ export function GameViewport({
       game.events.off(
         TERRITORY_SUMMARY_CHANGED_EVENT,
         handleTerritorySummaryChanged,
+      );
+      game.events.off(
+        TERRITORY_PLACEMENT_PREVIEW_CHANGED_EVENT,
+        handlePlacementPreviewChanged,
       );
       game.destroy(true);
       gameRef.current = null;
@@ -219,6 +240,10 @@ export function GameViewport({
   useEffect(() => {
     onTerritorySummaryChangedRef.current = onTerritorySummaryChanged;
   }, [onTerritorySummaryChanged]);
+
+  useEffect(() => {
+    onPlacementPreviewChangedRef.current = onPlacementPreviewChanged;
+  }, [onPlacementPreviewChanged]);
 
   useEffect(() => {
     const game = gameRef.current;

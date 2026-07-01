@@ -26,6 +26,7 @@ import type {
   SelectedTileTypeId,
   SelectedUpgradeTypeId,
   TerritorySummaryChangedPayload,
+  TerritoryPlacementPreviewChangedPayload,
 } from "../game/gameEvents";
 import "./App.css";
 
@@ -175,6 +176,8 @@ export function App() {
     useState<HexRotation>(0);
   const [territorySummary, setTerritorySummary] =
     useState<TerritorySummaryChangedPayload>(createEmptyTerritorySummary);
+  const [placementPreview, setPlacementPreview] =
+    useState<TerritoryPlacementPreviewChangedPayload>(null);
 
   const proposals = getPrototypeTurnProposals(turnState.number);
   const selectedTileDefinition =
@@ -224,6 +227,7 @@ export function App() {
     setSelectedTileTypeId(null);
     setSelectedUpgradeTypeId(null);
     setSelectedTileRotation(0);
+    setPlacementPreview(null);
   }
 
   function handleEndTurn(): void {
@@ -420,7 +424,41 @@ export function App() {
               }}
               selectedTileRotation={selectedTileRotation}
               onTerritorySummaryChanged={setTerritorySummary}
+              onPlacementPreviewChanged={setPlacementPreview}
             />
+            {placementPreview !== null ? (
+              <aside
+                className={`placement-preview-banner${
+                  placementPreview.valid
+                    ? ""
+                    : " placement-preview-banner--invalid"
+                }`}
+                aria-live="polite"
+              >
+                <span
+                  className="placement-preview-banner__icon"
+                  aria-hidden="true"
+                >
+                  {placementPreview.valid ? "✦" : "!"}
+                </span>
+
+                <span className="placement-preview-banner__content">
+                  <small>
+                    {placementPreview.synergyLabels.length > 0
+                      ? "Synergie au placement"
+                      : placementPreview.valid
+                        ? "Aperçu du placement"
+                        : "Placement impossible"}
+                  </small>
+
+                  <strong>
+                    {placementPreview.synergyLabels.length > 0
+                      ? placementPreview.synergyLabels.join(" · ")
+                      : placementPreview.message}
+                  </strong>
+                </span>
+              </aside>
+            ) : null}
           </div>
         </section>
 
@@ -654,10 +692,6 @@ export function App() {
                         </span>
                       ))}
                     </span>
-                  </span>
-
-                  <span className="proposal-card__cta">
-                    {isSelected ? "Tuile sélectionnée" : "Choisir cette tuile"}
                   </span>
                 </button>
               );

@@ -1285,3 +1285,171 @@ p {
     width: 100%;
   }
 }
+
+/* ==========================================================================
+   Preview contextuelle du placement
+   ========================================================================== */
+
+.placement-preview-banner {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  bottom: 18px;
+  display: flex;
+  width: min(520px, calc(100% - 150px));
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 14px;
+  color: #fff;
+  background: rgb(35 76 49 / 91%);
+  box-shadow: 0 13px 34px rgb(20 45 28 / 26%);
+  backdrop-filter: blur(9px);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.placement-preview-banner--invalid {
+  background: rgb(125 60 46 / 92%);
+}
+
+.placement-preview-banner__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 10px;
+  color: #284c32;
+  background: #edf7e8;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.placement-preview-banner--invalid .placement-preview-banner__icon {
+  color: #7d3c2e;
+  background: #fff0e9;
+}
+
+.placement-preview-banner__content {
+  min-width: 0;
+}
+
+.placement-preview-banner__content small,
+.placement-preview-banner__content strong {
+  display: block;
+}
+
+.placement-preview-banner__content small {
+  color: rgb(255 255 255 / 72%);
+  font-size: 0.61rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.placement-preview-banner__content strong {
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Proposition entièrement cliquable, effets plus visibles
+   ========================================================================== */
+
+.proposal-card {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.proposal-card__body {
+  padding-bottom: 9px;
+}
+
+.proposal-card__effects {
+  align-self: end;
+  gap: 8px;
+  padding: 7px 14px 14px;
+}
+
+.proposal-card__effects > span:first-child {
+  font-size: 0.65rem;
+}
+
+.proposal-card__resources {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.proposal-resource {
+  grid-template-columns: 25px minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: 8px 9px;
+  border-radius: 10px;
+}
+
+.proposal-resource > span:first-child {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 72%);
+  font-size: 0.9rem;
+}
+
+.proposal-resource small {
+  font-size: 0.64rem;
+  font-weight: 750;
+}
+
+.proposal-resource strong {
+  font-size: 0.92rem;
+}
+
+/* Le CTA interne n'existe plus. Cette règle protège également contre un
+   ancien cache CSS/JS pendant le développement. */
+.proposal-card__cta {
+  display: none;
+}
+
+.proposal-card::after {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  content: "Cliquer pour sélectionner";
+  color: var(--ink-500);
+  font-size: 0.59rem;
+  font-weight: 750;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.proposal-card:hover:not(:disabled)::after {
+  opacity: 0.72;
+}
+
+.proposal-card--selected::after {
+  content: "Sélection active";
+  color: #2f73ae;
+  opacity: 1;
+}
+
+@media (max-width: 760px) {
+  .placement-preview-banner {
+    bottom: 68px;
+    width: calc(100% - 24px);
+  }
+
+  .proposal-card__resources {
+    grid-template-columns: 1fr;
+  }
+
+  .proposal-card::after {
+    display: none;
+  }
+}

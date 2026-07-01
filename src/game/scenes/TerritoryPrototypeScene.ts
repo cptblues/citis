@@ -40,6 +40,7 @@ import {
   TERRITORY_UPGRADE_APPLIED_EVENT,
   type SelectedTileTypeId,
   type SelectedUpgradeTypeId,
+  TERRITORY_PLACEMENT_PREVIEW_CHANGED_EVENT,
 } from "../gameEvents";
 import {
   formatPlacementPreview,
@@ -355,10 +356,19 @@ export class TerritoryPrototypeScene extends Phaser.Scene {
       affectedCellIds: preview.valid ? preview.affectedCellIds : [],
       message,
     });
+
+    this.game.events.emit(TERRITORY_PLACEMENT_PREVIEW_CHANGED_EVENT, {
+      valid: preview.valid,
+      message,
+      synergyLabels: preview.valid
+        ? preview.createdSynergies.map((synergy) => synergy.label)
+        : [],
+    });
   }
 
   private clearPlacementPreview(): void {
     this.placementPreviewView.clear();
+    this.game.events.emit(TERRITORY_PLACEMENT_PREVIEW_CHANGED_EVENT, null);
   }
 
   private handleSelectedTileTypeChanged(tileTypeId: SelectedTileTypeId): void {

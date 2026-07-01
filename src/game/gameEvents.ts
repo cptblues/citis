@@ -47,3 +47,20 @@ export interface TerritorySummaryChangedPayload {
   resources: TerritoryResources;
   placedTileCount: number;
 }
+
+/**
+ * Émis lorsque le joueur survole ou quitte une case pendant un placement.
+ *
+ * `null` signifie qu'aucune case n'est actuellement prévisualisée.
+ */
+export const TERRITORY_PLACEMENT_PREVIEW_CHANGED_EVENT =
+  "citis:territory-placement-preview-changed";
+
+export interface TerritoryPlacementPreviewPayload {
+  valid: boolean;
+  message: string;
+  synergyLabels: readonly string[];
+}
+
+export type TerritoryPlacementPreviewChangedPayload =
+  TerritoryPlacementPreviewPayload | null;
