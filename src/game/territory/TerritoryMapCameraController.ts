@@ -1,12 +1,19 @@
 import Phaser from "phaser";
+import {
+  calculateFitZoom,
+  centerMapPointInViewport,
+  clampMapPosition,
+  zoomMapPositionAroundPoint,
+} from "./territoryMapCameraMath";
 
 export const TERRITORY_MAP_CONTAINER_NAME = "territory-map-container";
 
-const INITIAL_ZOOM = 1.42;
-const MINIMUM_ZOOM = 1;
+const DEFAULT_INITIAL_ZOOM = 1.08;
+const INITIAL_ZOOM_LIMIT = 1.35;
 const MAXIMUM_ZOOM = 2.25;
-const DRAG_THRESHOLD = 7;
-const WHEEL_ZOOM_SENSITIVITY = 0.0015;
+const DRAG_THRESHOLD = 8;
+const WHEEL_ZOOM_SENSITIVITY = 0.00135;
+const MAXIMUM_WHEEL_DELTA = 160;
 
 interface TerritoryMapCameraControllerOptions {
   scene: Phaser.Scene;
@@ -14,55 +21,158 @@ interface TerritoryMapCameraControllerOptions {
   viewport: Phaser.Geom.Rectangle;
   contentBounds: Phaser.Geom.Rectangle;
   focusPoint: Phaser.Math.Vector2;
+  canPanWithPrimaryPointer: () => boolean;
   onCellClick: (cellId: string) => void;
-  onDragStart: () => void;
+  onViewInteraction: () => void;
+}
+
+interface PointerInteraction {
+  pointerId: number;
+  pressedCellId: string | null;
+  allowClick: boolean;
+  allowPan: boolean;
+  explicitPan: boolean;
+  startX: number;
+  startY: number;
+  containerStartX: number;
+  containerStartY: number;
+  movedBeyondThreshold: boolean;
+  dragging: boolean;
+}
+
+interface BeginInteractionOptions {
+  cellId: string | null;
+  allowClick: boolean;
+  allowPan: boolean;
+  explicitPan: boolean;
 }
 
 /**
- * Contrôle la vue de la carte sans déplacer les éléments d'interface Phaser.
+ * Contrôle le zoom et le déplacement du conteneur de carte.
  *
- * La carte est contenue dans un Container dédié : le glisser-déposer et le
- * zoom modifient uniquement ce container. Un clic n'est transmis à une case
- * que si le pointeur n'a pas dépassé le seuil de déplacement.
+ * À la souris, le clic gauche reste réservé au placement lorsqu'une action est
+ * sélectionnée. La carte se déplace avec le clic droit, le clic molette ou
+ * Espace + clic gauche. Sans action sélectionnée, un glisser gauche reste
+ * possible. Au tactile, un appui bref clique et un glisser déplace la carte.
  */
 export class TerritoryMapCameraController {
   private readonly scene: Phaser.Scene;
   private readonly mapContainer: Phaser.GameObjects.Container;
   private readonly viewport: Phaser.Geom.Rectangle;
   private readonly contentBounds: Phaser.Geom.Rectangle;
+  private readonly canPanWithPrimaryPointer: () => boolean;
   private readonly onCellClick: (cellId: string) => void;
-  private readonly onDragStart: () => void;
+  private readonly onViewInteraction: () => void;
+  private readonly spaceKey: Phaser.Input.Keyboard.Key | null;
 
-  private activePointerId: number | null = null;
-  private pressedCellId: string | null = null;
-  private dragStartX = 0;
-  private dragStartY = 0;
-  private containerStartX = 0;
-  private containerStartY = 0;
-  private dragging = false;
+  private interaction: PointerInteraction | null = null;
+  private minimumZoom = 1;
+  private maximumZoom = MAXIMUM_ZOOM;
   private destroyed = false;
 
   public constructor(options: TerritoryMapCameraControllerOptions) {
     this.scene = options.scene;
     this.mapContainer = options.mapContainer;
-    this.viewport = options.viewport;
-    this.contentBounds = options.contentBounds;
+    this.viewport = Phaser.Geom.Rectangle.Clone(options.viewport);
+    this.contentBounds = Phaser.Geom.Rectangle.Clone(options.contentBounds);
+    this.canPanWithPrimaryPointer = options.canPanWithPrimaryPointer;
     this.onCellClick = options.onCellClick;
-    this.onDragStart = options.onDragStart;
+    this.onViewInteraction = options.onViewInteraction;
+    this.spaceKey =
+      this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE) ??
+      null;
 
+    this.recalculateZoomLimits();
     this.bindInputEvents();
     this.resetView(options.focusPoint);
   }
 
   public isDragging(): boolean {
-    return this.dragging;
+    return this.interaction?.dragging === true;
   }
 
   public registerCellPointerDown(
     pointer: Phaser.Input.Pointer,
     cellId: string,
   ): void {
-    this.beginPointerInteraction(pointer, cellId);
+    if (!this.isPointerInsideViewport(pointer)) {
+      return;
+    }
+
+    const explicitPan = this.isExplicitPanGesture(pointer);
+
+    if (explicitPan) {
+      this.beginOrMergeInteraction(pointer, {
+        cellId: null,
+        allowClick: false,
+        allowPan: true,
+        explicitPan: true,
+      });
+      return;
+    }
+
+    const allowPrimaryPan = pointer.wasTouch || this.canPanWithPrimaryPointer();
+
+    this.beginOrMergeInteraction(pointer, {
+      cellId,
+      allowClick: true,
+      allowPan: allowPrimaryPan,
+      explicitPan: false,
+    });
+  }
+
+  public updateViewport(viewport: Phaser.Geom.Rectangle): void {
+    const currentScale = this.mapContainer.scaleX;
+    const currentViewportCenter = new Phaser.Math.Vector2(
+      this.viewport.centerX,
+      this.viewport.centerY,
+    );
+    const mapPointAtViewportCenter = new Phaser.Math.Vector2(
+      (currentViewportCenter.x - this.mapContainer.x) / currentScale,
+      (currentViewportCenter.y - this.mapContainer.y) / currentScale,
+    );
+
+    this.viewport.setTo(
+      viewport.x,
+      viewport.y,
+      viewport.width,
+      viewport.height,
+    );
+    this.recalculateZoomLimits();
+
+    const nextScale = Phaser.Math.Clamp(
+      currentScale,
+      this.minimumZoom,
+      this.maximumZoom,
+    );
+    const nextPosition = centerMapPointInViewport(
+      mapPointAtViewportCenter,
+      nextScale,
+      this.viewport,
+    );
+
+    this.mapContainer.setScale(nextScale);
+    this.mapContainer.setPosition(nextPosition.x, nextPosition.y);
+    this.clampCurrentPosition();
+    this.refreshCursor();
+  }
+
+  public refreshCursor(): void {
+    if (this.destroyed) {
+      return;
+    }
+
+    if (this.interaction?.dragging === true) {
+      this.scene.input.setDefaultCursor("grabbing");
+      return;
+    }
+
+    if (this.spaceKey?.isDown === true || this.canPanWithPrimaryPointer()) {
+      this.scene.input.setDefaultCursor("grab");
+      return;
+    }
+
+    this.scene.input.setDefaultCursor("default");
   }
 
   public destroy(): void {
@@ -74,64 +184,98 @@ export class TerritoryMapCameraController {
     this.scene.input.off("pointerdown", this.handleScenePointerDown);
     this.scene.input.off("pointermove", this.handlePointerMove);
     this.scene.input.off("pointerup", this.handlePointerUp);
-    this.scene.input.off("gameout", this.handleGameOut);
+    this.scene.input.off("pointerupoutside", this.handlePointerUp);
     this.scene.input.off("wheel", this.handleWheel);
+    this.spaceKey?.off("down", this.handleSpaceKeyChanged);
+    this.spaceKey?.off("up", this.handleSpaceKeyChanged);
     this.scene.input.setDefaultCursor("default");
   }
 
   private readonly handleScenePointerDown = (
     pointer: Phaser.Input.Pointer,
   ): void => {
-    this.beginPointerInteraction(pointer, null);
+    if (!this.isPointerInsideViewport(pointer)) {
+      return;
+    }
+
+    const explicitPan = this.isExplicitPanGesture(pointer);
+
+    if (explicitPan) {
+      this.beginOrMergeInteraction(pointer, {
+        cellId: null,
+        allowClick: false,
+        allowPan: true,
+        explicitPan: true,
+      });
+      return;
+    }
+
+    if (pointer.wasTouch || this.canPanWithPrimaryPointer()) {
+      this.beginOrMergeInteraction(pointer, {
+        cellId: null,
+        allowClick: false,
+        allowPan: true,
+        explicitPan: false,
+      });
+    }
   };
 
   private readonly handlePointerMove = (
     pointer: Phaser.Input.Pointer,
   ): void => {
+    const interaction = this.interaction;
+
     if (
-      this.activePointerId === null ||
-      pointer.id !== this.activePointerId ||
+      interaction === null ||
+      pointer.id !== interaction.pointerId ||
       !pointer.isDown
     ) {
       return;
     }
 
-    const deltaX = pointer.x - this.dragStartX;
-    const deltaY = pointer.y - this.dragStartY;
+    const deltaX = pointer.x - interaction.startX;
+    const deltaY = pointer.y - interaction.startY;
+    const movedBeyondThreshold = Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD;
 
-    if (!this.dragging && Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD) {
-      this.dragging = true;
-      this.pressedCellId = null;
-      this.onDragStart();
-      this.scene.input.setDefaultCursor("grabbing");
+    if (movedBeyondThreshold && !interaction.movedBeyondThreshold) {
+      interaction.movedBeyondThreshold = true;
+      interaction.pressedCellId = null;
+
+      if (interaction.allowPan) {
+        interaction.dragging = true;
+        this.onViewInteraction();
+        this.scene.input.setDefaultCursor("grabbing");
+      }
     }
 
-    if (!this.dragging) {
+    if (!interaction.dragging) {
       return;
     }
 
     this.mapContainer.setPosition(
-      this.containerStartX + deltaX,
-      this.containerStartY + deltaY,
+      interaction.containerStartX + deltaX,
+      interaction.containerStartY + deltaY,
     );
-    this.clampMapPosition();
+    this.clampCurrentPosition();
   };
 
   private readonly handlePointerUp = (pointer: Phaser.Input.Pointer): void => {
-    if (this.activePointerId === null || pointer.id !== this.activePointerId) {
+    const interaction = this.interaction;
+
+    if (interaction === null || pointer.id !== interaction.pointerId) {
       return;
     }
 
-    const clickedCellId = this.dragging ? null : this.pressedCellId;
+    const clickedCellId =
+      interaction.allowClick && !interaction.movedBeyondThreshold
+        ? interaction.pressedCellId
+        : null;
+
     this.clearPointerInteraction();
 
     if (clickedCellId !== null) {
       this.onCellClick(clickedCellId);
     }
-  };
-
-  private readonly handleGameOut = (): void => {
-    this.clearPointerInteraction();
   };
 
   private readonly handleWheel = (
@@ -140,119 +284,156 @@ export class TerritoryMapCameraController {
     _deltaX: number,
     deltaY: number,
   ): void => {
-    if (!this.viewport.contains(pointer.x, pointer.y)) {
+    if (!this.isPointerInsideViewport(pointer)) {
       return;
     }
 
     const previousScale = this.mapContainer.scaleX;
-    const zoomFactor = Math.exp(-deltaY * WHEEL_ZOOM_SENSITIVITY);
+    const boundedDeltaY = Phaser.Math.Clamp(
+      deltaY,
+      -MAXIMUM_WHEEL_DELTA,
+      MAXIMUM_WHEEL_DELTA,
+    );
+    const zoomFactor = Math.exp(-boundedDeltaY * WHEEL_ZOOM_SENSITIVITY);
     const nextScale = Phaser.Math.Clamp(
       previousScale * zoomFactor,
-      MINIMUM_ZOOM,
-      MAXIMUM_ZOOM,
+      this.minimumZoom,
+      this.maximumZoom,
     );
 
-    if (Math.abs(nextScale - previousScale) < 0.001) {
+    if (Math.abs(nextScale - previousScale) < 0.0005) {
       return;
     }
 
-    const localPointerX = (pointer.x - this.mapContainer.x) / previousScale;
-    const localPointerY = (pointer.y - this.mapContainer.y) / previousScale;
+    this.onViewInteraction();
+
+    const nextPosition = zoomMapPositionAroundPoint(
+      this.mapContainer,
+      previousScale,
+      nextScale,
+      pointer,
+    );
 
     this.mapContainer.setScale(nextScale);
-    this.mapContainer.setPosition(
-      pointer.x - localPointerX * nextScale,
-      pointer.y - localPointerY * nextScale,
-    );
-    this.clampMapPosition();
+    this.mapContainer.setPosition(nextPosition.x, nextPosition.y);
+    this.clampCurrentPosition();
+    this.refreshCursor();
+  };
+
+  private readonly handleSpaceKeyChanged = (): void => {
+    this.refreshCursor();
   };
 
   private bindInputEvents(): void {
     this.scene.input.on("pointerdown", this.handleScenePointerDown);
     this.scene.input.on("pointermove", this.handlePointerMove);
     this.scene.input.on("pointerup", this.handlePointerUp);
-    this.scene.input.on("gameout", this.handleGameOut);
+    this.scene.input.on("pointerupoutside", this.handlePointerUp);
     this.scene.input.on("wheel", this.handleWheel);
-    this.scene.input.setDefaultCursor("grab");
-
+    this.spaceKey?.on("down", this.handleSpaceKeyChanged);
+    this.spaceKey?.on("up", this.handleSpaceKeyChanged);
     this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
+    this.refreshCursor();
   }
 
-  private beginPointerInteraction(
+  private beginOrMergeInteraction(
     pointer: Phaser.Input.Pointer,
-    cellId: string | null,
+    options: BeginInteractionOptions,
   ): void {
-    if (
-      !pointer.isDown ||
-      pointer.button === 2 ||
-      !this.viewport.contains(pointer.x, pointer.y)
-    ) {
+    if (!pointer.isDown || !this.isPointerInsideViewport(pointer)) {
       return;
     }
 
-    if (this.activePointerId === pointer.id) {
-      if (!this.dragging && cellId !== null) {
-        this.pressedCellId = cellId;
+    if (this.interaction?.pointerId === pointer.id) {
+      if (options.explicitPan) {
+        this.interaction.explicitPan = true;
+        this.interaction.allowClick = false;
+        this.interaction.allowPan = true;
+        this.interaction.pressedCellId = null;
+        return;
+      }
+
+      if (!this.interaction.explicitPan) {
+        this.interaction.allowPan ||= options.allowPan;
+        this.interaction.allowClick ||= options.allowClick;
+
+        if (options.allowClick && options.cellId !== null) {
+          this.interaction.pressedCellId = options.cellId;
+        }
       }
 
       return;
     }
 
-    if (this.activePointerId !== null) {
+    if (this.interaction !== null) {
       return;
     }
 
-    this.activePointerId = pointer.id;
-    this.pressedCellId = cellId;
-    this.dragStartX = pointer.x;
-    this.dragStartY = pointer.y;
-    this.containerStartX = this.mapContainer.x;
-    this.containerStartY = this.mapContainer.y;
-    this.dragging = false;
+    this.interaction = {
+      pointerId: pointer.id,
+      pressedCellId: options.allowClick ? options.cellId : null,
+      allowClick: options.allowClick,
+      allowPan: options.allowPan,
+      explicitPan: options.explicitPan,
+      startX: pointer.x,
+      startY: pointer.y,
+      containerStartX: this.mapContainer.x,
+      containerStartY: this.mapContainer.y,
+      movedBeyondThreshold: false,
+      dragging: false,
+    };
+
+    this.refreshCursor();
   }
 
   private clearPointerInteraction(): void {
-    this.activePointerId = null;
-    this.pressedCellId = null;
-    this.dragging = false;
-    this.scene.input.setDefaultCursor("grab");
+    this.interaction = null;
+    this.refreshCursor();
   }
 
   private resetView(focusPoint: Phaser.Math.Vector2): void {
-    const scale = Phaser.Math.Clamp(INITIAL_ZOOM, MINIMUM_ZOOM, MAXIMUM_ZOOM);
+    const requestedZoom = Math.min(
+      INITIAL_ZOOM_LIMIT,
+      Math.max(DEFAULT_INITIAL_ZOOM, this.minimumZoom * 1.55),
+    );
+    const scale = Phaser.Math.Clamp(
+      requestedZoom,
+      this.minimumZoom,
+      this.maximumZoom,
+    );
+    const position = centerMapPointInViewport(focusPoint, scale, this.viewport);
 
     this.mapContainer.setScale(scale);
-    this.mapContainer.setPosition(
-      this.viewport.centerX - focusPoint.x * scale,
-      this.viewport.centerY - focusPoint.y * scale,
-    );
-    this.clampMapPosition();
+    this.mapContainer.setPosition(position.x, position.y);
+    this.clampCurrentPosition();
   }
 
-  private clampMapPosition(): void {
-    const scale = this.mapContainer.scaleX;
-    const scaledWidth = this.contentBounds.width * scale;
-    const scaledHeight = this.contentBounds.height * scale;
+  private recalculateZoomLimits(): void {
+    const fitZoom = calculateFitZoom(this.viewport, this.contentBounds);
+    this.minimumZoom = Math.min(1, fitZoom);
+    this.maximumZoom = Math.max(MAXIMUM_ZOOM, this.minimumZoom);
+  }
 
-    let nextX = this.mapContainer.x;
-    let nextY = this.mapContainer.y;
+  private clampCurrentPosition(): void {
+    const nextPosition = clampMapPosition(
+      this.mapContainer,
+      this.mapContainer.scaleX,
+      this.viewport,
+      this.contentBounds,
+    );
 
-    if (scaledWidth <= this.viewport.width) {
-      nextX = this.viewport.centerX - this.contentBounds.centerX * scale;
-    } else {
-      const minimumX = this.viewport.right - this.contentBounds.right * scale;
-      const maximumX = this.viewport.left - this.contentBounds.left * scale;
-      nextX = Phaser.Math.Clamp(nextX, minimumX, maximumX);
-    }
+    this.mapContainer.setPosition(nextPosition.x, nextPosition.y);
+  }
 
-    if (scaledHeight <= this.viewport.height) {
-      nextY = this.viewport.centerY - this.contentBounds.centerY * scale;
-    } else {
-      const minimumY = this.viewport.bottom - this.contentBounds.bottom * scale;
-      const maximumY = this.viewport.top - this.contentBounds.top * scale;
-      nextY = Phaser.Math.Clamp(nextY, minimumY, maximumY);
-    }
+  private isExplicitPanGesture(pointer: Phaser.Input.Pointer): boolean {
+    return (
+      pointer.rightButtonDown() ||
+      pointer.middleButtonDown() ||
+      (pointer.leftButtonDown() && this.spaceKey?.isDown === true)
+    );
+  }
 
-    this.mapContainer.setPosition(nextX, nextY);
+  private isPointerInsideViewport(pointer: Phaser.Input.Pointer): boolean {
+    return this.viewport.contains(pointer.x, pointer.y);
   }
 }

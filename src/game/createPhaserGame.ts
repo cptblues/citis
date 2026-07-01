@@ -1,5 +1,4 @@
 import Phaser from "phaser";
-
 import { TerritoryPrototypeScene } from "./scenes/TerritoryPrototypeScene";
 
 const FALLBACK_GAME_WIDTH = 960;
@@ -14,7 +13,6 @@ const FALLBACK_GAME_HEIGHT = 640;
 export function createPhaserGame(parent: HTMLElement): Phaser.Game {
   const width =
     parent.clientWidth > 0 ? parent.clientWidth : FALLBACK_GAME_WIDTH;
-
   const height =
     parent.clientHeight > 0 ? parent.clientHeight : FALLBACK_GAME_HEIGHT;
 
@@ -24,14 +22,21 @@ export function createPhaserGame(parent: HTMLElement): Phaser.Game {
     width,
     height,
     backgroundColor: "#dfe8dd",
+    disableContextMenu: true,
+    input: {
+      mouse: {
+        preventDefaultDown: true,
+        preventDefaultUp: true,
+        preventDefaultMove: true,
+        preventDefaultWheel: true,
+      },
+    },
     scene: [TerritoryPrototypeScene],
-
     render: {
       antialias: true,
       pixelArt: false,
       roundPixels: false,
     },
-
     scale: {
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,

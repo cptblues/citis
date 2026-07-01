@@ -23,13 +23,13 @@ import {
   TerritoryMapCameraController,
 } from "./TerritoryMapCameraController";
 
-const BOARD_LEFT = 28;
-const BOARD_RIGHT = 932;
+const BOARD_HORIZONTAL_MARGIN = 28;
 const BOARD_TOP = 184;
-const BOARD_BOTTOM = 626;
-const MAX_HEX_SIZE = 62;
+const BOARD_BOTTOM_MARGIN = 14;
+const NATURAL_HEX_SIZE = 54;
 const TILE_CONTENT_REFERENCE_SIZE = 62;
 const HEX_HORIZONTAL_RADIUS = Math.sqrt(3) / 2;
+const CONTENT_BOUNDS_PADDING = NATURAL_HEX_SIZE * 1.1;
 
 const EMPTY_FILL_COLOR = 0xffffff;
 const EMPTY_STROKE_COLOR = 0x9ba79c;
@@ -77,6 +77,7 @@ export interface TerritoryCellView {
   cell: BoardCell;
   graphics: Phaser.GameObjects.Graphics;
   corners: HexPoint[];
+  localCorners: HexPoint[];
   centerX: number;
   centerY: number;
   contentScale: number;
@@ -109,7 +110,9 @@ export class TerritoryBoardView {
   private readonly mapContainer: Phaser.GameObjects.Container;
   private readonly networkGraphics: Phaser.GameObjects.Graphics;
   private readonly layout: TerritoryBoardLayout;
+  private readonly maskGraphics: Phaser.GameObjects.Graphics;
   private readonly cameraController: TerritoryMapCameraController;
+  private viewport: Phaser.Geom.Rectangle;
   private hoveredCellId: string | null = null;
 
   public constructor(
@@ -123,24 +126,18 @@ export class TerritoryBoardView {
     this.getVisualState = getVisualState;
     this.callbacks = callbacks;
     this.layout = createBoardLayout(cells);
+    this.viewport = createBoardViewport(
+      this.scene.scale.gameSize.width,
+      this.scene.scale.gameSize.height,
+    );
     this.mapContainer = this.scene.add
       .container(0, 0)
       .setName(TERRITORY_MAP_CONTAINER_NAME)
       .setDepth(0);
 
-    const maskGraphics = new Phaser.GameObjects.Graphics(this.scene);
-    maskGraphics.fillStyle(0xffffff, 1);
-    maskGraphics.fillRect(
-      BOARD_LEFT,
-      BOARD_TOP,
-      BOARD_RIGHT - BOARD_LEFT,
-      BOARD_BOTTOM - BOARD_TOP,
-    );
-    this.mapContainer.setMask(maskGraphics.createGeometryMask());
-    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.mapContainer.clearMask(true);
-      maskGraphics.destroy();
-    });
+    this.maskGraphics = new Phaser.GameObjects.Graphics(this.scene);
+    this.updateMask();
+    this.mapContainer.setMask(this.maskGraphics.createGeometryMask());
 
     this.networkGraphics = this.scene.add.graphics();
 
@@ -149,19 +146,26 @@ export class TerritoryBoardView {
     this.drawNetworks();
     this.drawInitialTileContents();
 
-    const contentBounds = createMapContentBounds(this.cellViews.values());
+    const contentBounds = createMapContentBounds(
+      this.cellViews.values(),
+      CONTENT_BOUNDS_PADDING,
+    );
     const focusPoint = this.getInitialFocusPoint(contentBounds);
+
     this.cameraController = new TerritoryMapCameraController({
       scene: this.scene,
       mapContainer: this.mapContainer,
-      viewport: new Phaser.Geom.Rectangle(
-        BOARD_LEFT,
-        BOARD_TOP,
-        BOARD_RIGHT - BOARD_LEFT,
-        BOARD_BOTTOM - BOARD_TOP,
-      ),
+      viewport: this.viewport,
       contentBounds,
       focusPoint,
+      canPanWithPrimaryPointer: () => {
+        const state = this.getVisualState();
+
+        return (
+          state.selectedTileTypeId === null &&
+          state.selectedUpgradeTypeId === null
+        );
+      },
       onCellClick: (cellId) => {
         const cell = this.cellViews.get(cellId)?.cell;
 
@@ -172,9 +176,16 @@ export class TerritoryBoardView {
         this.callbacks.onCellPointerDown(cell);
         this.redrawAll();
       },
-      onDragStart: () => {
+      onViewInteraction: () => {
         this.clearHoveredCell();
       },
+    });
+
+    this.scene.scale.on("resize", this.handleScaleResize);
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scene.scale.off("resize", this.handleScaleResize);
+      this.mapContainer.clearMask(true);
+      this.maskGraphics.destroy();
     });
   }
 
@@ -182,6 +193,8 @@ export class TerritoryBoardView {
     for (const cellId of this.cellViews.keys()) {
       this.redrawCell(cellId);
     }
+
+    this.cameraController.refreshCursor();
   }
 
   public getCellView(cellId: string): TerritoryCellView | undefined {
@@ -207,34 +220,44 @@ export class TerritoryBoardView {
       );
   }
 
+  private readonly handleScaleResize = (): void => {
+    this.viewport = createBoardViewport(
+      this.scene.scale.gameSize.width,
+      this.scene.scale.gameSize.height,
+    );
+    this.updateMask();
+    this.clearHoveredCell();
+    this.cameraController.updateViewport(this.viewport);
+  };
+
   private createCells(): void {
     for (const cell of this.cells) {
       const relativePosition = axialToPixel(cell, this.layout.hexSize);
       const centerX = this.layout.offsetX + relativePosition.x;
       const centerY = this.layout.offsetY + relativePosition.y;
-      const corners = getHexCorners(
-        centerX,
-        centerY,
-        Math.max(4, this.layout.hexSize - 1.4),
-      );
+      const renderedHexSize = Math.max(4, this.layout.hexSize - 1.4);
+      const corners = getHexCorners(centerX, centerY, renderedHexSize);
+      const localCorners = getHexCorners(0, 0, renderedHexSize);
 
-      this.createCellView(cell, corners, centerX, centerY);
+      this.createCellView(cell, corners, localCorners, centerX, centerY);
     }
   }
 
   private createCellView(
     cell: BoardCell,
     corners: HexPoint[],
+    localCorners: HexPoint[],
     centerX: number,
     centerY: number,
   ): void {
-    const graphics = this.scene.add.graphics();
+    const graphics = this.scene.add.graphics().setPosition(centerX, centerY);
     this.mapContainer.add(graphics);
 
     this.cellViews.set(cell.id, {
       cell,
       graphics,
       corners,
+      localCorners,
       centerX,
       centerY,
       contentScale: this.layout.contentScale,
@@ -243,7 +266,7 @@ export class TerritoryBoardView {
 
     if (cell.blocked !== true) {
       graphics.setInteractive(
-        new Phaser.Geom.Polygon(corners),
+        new Phaser.Geom.Polygon(localCorners),
         Phaser.Geom.Polygon.Contains,
       );
 
@@ -356,17 +379,12 @@ export class TerritoryBoardView {
         ? 0.35
         : 1,
     );
-    cellView.graphics.fillPoints(cellView.corners, true);
-    cellView.graphics.strokePoints(cellView.corners, true);
+    cellView.graphics.fillPoints(cellView.localCorners, true);
+    cellView.graphics.strokePoints(cellView.localCorners, true);
   }
 
   private isPointerInsideBoard(pointer: Phaser.Input.Pointer): boolean {
-    return (
-      pointer.x >= BOARD_LEFT &&
-      pointer.x <= BOARD_RIGHT &&
-      pointer.y >= BOARD_TOP &&
-      pointer.y <= BOARD_BOTTOM
-    );
+    return this.viewport.contains(pointer.x, pointer.y);
   }
 
   private clearHoveredCell(): void {
@@ -407,6 +425,17 @@ export class TerritoryBoardView {
     return new Phaser.Math.Vector2(
       contentBounds.centerX,
       contentBounds.centerY,
+    );
+  }
+
+  private updateMask(): void {
+    this.maskGraphics.clear();
+    this.maskGraphics.fillStyle(0xffffff, 1);
+    this.maskGraphics.fillRect(
+      this.viewport.x,
+      this.viewport.y,
+      this.viewport.width,
+      this.viewport.height,
     );
   }
 
@@ -598,24 +627,42 @@ export class TerritoryBoardView {
   }
 }
 
+function createBoardViewport(
+  sceneWidth: number,
+  sceneHeight: number,
+): Phaser.Geom.Rectangle {
+  const horizontalMargin = Math.min(
+    BOARD_HORIZONTAL_MARGIN,
+    Math.max(12, sceneWidth * 0.03),
+  );
+  const top = Math.min(BOARD_TOP, Math.max(104, sceneHeight * 0.29));
+  const bottomMargin = Math.min(
+    BOARD_BOTTOM_MARGIN,
+    Math.max(8, sceneHeight * 0.02),
+  );
+
+  return new Phaser.Geom.Rectangle(
+    horizontalMargin,
+    top,
+    Math.max(1, sceneWidth - horizontalMargin * 2),
+    Math.max(1, sceneHeight - top - bottomMargin),
+  );
+}
+
 function createMapContentBounds(
   cellViews: Iterable<TerritoryCellView>,
+  padding: number,
 ): Phaser.Geom.Rectangle {
   const corners = [...cellViews].flatMap((cellView) => cellView.corners);
 
   if (corners.length === 0) {
-    return new Phaser.Geom.Rectangle(
-      BOARD_LEFT,
-      BOARD_TOP,
-      BOARD_RIGHT - BOARD_LEFT,
-      BOARD_BOTTOM - BOARD_TOP,
-    );
+    return new Phaser.Geom.Rectangle(-1, -1, 2, 2);
   }
 
-  const minimumX = Math.min(...corners.map((corner) => corner.x));
-  const maximumX = Math.max(...corners.map((corner) => corner.x));
-  const minimumY = Math.min(...corners.map((corner) => corner.y));
-  const maximumY = Math.max(...corners.map((corner) => corner.y));
+  const minimumX = Math.min(...corners.map((corner) => corner.x)) - padding;
+  const maximumX = Math.max(...corners.map((corner) => corner.x)) + padding;
+  const minimumY = Math.min(...corners.map((corner) => corner.y)) - padding;
+  const maximumY = Math.max(...corners.map((corner) => corner.y)) + padding;
 
   return new Phaser.Geom.Rectangle(
     minimumX,
@@ -628,43 +675,29 @@ function createMapContentBounds(
 function createBoardLayout(cells: readonly BoardCell[]): TerritoryBoardLayout {
   if (cells.length === 0) {
     return {
-      hexSize: MAX_HEX_SIZE,
-      contentScale: 1,
-      offsetX: (BOARD_LEFT + BOARD_RIGHT) / 2,
-      offsetY: (BOARD_TOP + BOARD_BOTTOM) / 2,
+      hexSize: NATURAL_HEX_SIZE,
+      contentScale: NATURAL_HEX_SIZE / TILE_CONTENT_REFERENCE_SIZE,
+      offsetX: 0,
+      offsetY: 0,
     };
   }
 
-  const unitCenters = cells.map((cell) => axialToPixel(cell, 1));
+  const centers = cells.map((cell) => axialToPixel(cell, NATURAL_HEX_SIZE));
+  const horizontalRadius = NATURAL_HEX_SIZE * HEX_HORIZONTAL_RADIUS;
   const minimumX =
-    Math.min(...unitCenters.map((position) => position.x)) -
-    HEX_HORIZONTAL_RADIUS;
+    Math.min(...centers.map((position) => position.x)) - horizontalRadius;
   const maximumX =
-    Math.max(...unitCenters.map((position) => position.x)) +
-    HEX_HORIZONTAL_RADIUS;
-  const minimumY = Math.min(...unitCenters.map((position) => position.y)) - 1;
-  const maximumY = Math.max(...unitCenters.map((position) => position.y)) + 1;
-  const boardWidthInUnits = maximumX - minimumX;
-  const boardHeightInUnits = maximumY - minimumY;
-  const availableWidth = BOARD_RIGHT - BOARD_LEFT;
-  const availableHeight = BOARD_BOTTOM - BOARD_TOP;
-  const fittedHexSize = Math.min(
-    availableWidth / boardWidthInUnits,
-    availableHeight / boardHeightInUnits,
-  );
-  const hexSize = Math.min(MAX_HEX_SIZE, fittedHexSize);
-  const renderedWidth = boardWidthInUnits * hexSize;
-  const renderedHeight = boardHeightInUnits * hexSize;
-  const offsetX =
-    BOARD_LEFT + (availableWidth - renderedWidth) / 2 - minimumX * hexSize;
-  const offsetY =
-    BOARD_TOP + (availableHeight - renderedHeight) / 2 - minimumY * hexSize;
+    Math.max(...centers.map((position) => position.x)) + horizontalRadius;
+  const minimumY =
+    Math.min(...centers.map((position) => position.y)) - NATURAL_HEX_SIZE;
+  const maximumY =
+    Math.max(...centers.map((position) => position.y)) + NATURAL_HEX_SIZE;
 
   return {
-    hexSize,
-    contentScale: hexSize / TILE_CONTENT_REFERENCE_SIZE,
-    offsetX,
-    offsetY,
+    hexSize: NATURAL_HEX_SIZE,
+    contentScale: NATURAL_HEX_SIZE / TILE_CONTENT_REFERENCE_SIZE,
+    offsetX: -(minimumX + maximumX) / 2,
+    offsetY: -(minimumY + maximumY) / 2,
   };
 }
 
