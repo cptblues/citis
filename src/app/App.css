@@ -1256,3 +1256,241 @@ p {
     width: 100%;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Correctif de structure : positions desktop déterministes                   */
+/* -------------------------------------------------------------------------- */
+
+@media (min-width: 1081px) {
+  .game-layout {
+    grid-template-areas:
+      "dashboard map actions"
+      "dashboard proposals actions";
+    grid-template-columns:
+      minmax(200px, 230px)
+      minmax(0, 1fr)
+      minmax(245px, 285px);
+    grid-template-rows:
+      minmax(0, 1fr)
+      minmax(245px, 31vh);
+  }
+
+  .dashboard-panel {
+    grid-area: dashboard;
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .map-panel {
+    grid-area: map;
+    grid-column: auto;
+    grid-row: auto;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .actions-panel {
+    grid-area: actions;
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .proposal-deck {
+    grid-area: proposals;
+    grid-column: auto;
+    grid-row: auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .proposal-grid {
+    height: calc(100% - 54px);
+    min-height: 0;
+  }
+
+  .proposal-card {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .proposal-card__visual {
+    min-height: 0;
+    height: 100%;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Écrans très larges : plus de place pour la map et les cartes               */
+/* -------------------------------------------------------------------------- */
+
+@media (min-width: 1500px) {
+  .game-layout {
+    grid-template-columns:
+      minmax(210px, 245px)
+      minmax(0, 1fr)
+      minmax(260px, 300px);
+    grid-template-rows:
+      minmax(0, 1fr)
+      minmax(260px, 32vh);
+  }
+
+  .proposal-card {
+    grid-template-columns: 126px minmax(0, 1fr);
+  }
+}
+
+/* ==========================================================================
+   Structure définitive de l'écran de jeu
+   ========================================================================== */
+
+.game-layout {
+  display: grid;
+  grid-template-areas:
+    "dashboard map actions"
+    "dashboard proposals actions";
+  grid-template-columns:
+    clamp(210px, 15vw, 245px)
+    minmax(0, 1fr)
+    clamp(260px, 19vw, 300px);
+  grid-template-rows:
+    minmax(360px, 1fr)
+    clamp(250px, 31vh, 330px);
+  gap: 10px;
+  height: calc(100svh - 106px);
+  margin-top: 10px;
+}
+
+.dashboard-panel {
+  grid-area: dashboard !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  min-width: 0;
+  min-height: 0;
+}
+
+.map-panel {
+  grid-area: map !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  min-width: 0;
+  min-height: 0;
+}
+
+.actions-panel {
+  grid-area: actions !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  min-width: 0;
+  min-height: 0;
+}
+
+.proposal-deck {
+  grid-area: proposals !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.proposal-deck__header {
+  min-height: 48px;
+  margin-bottom: 8px;
+}
+
+.proposal-grid {
+  height: calc(100% - 56px);
+  min-height: 0;
+}
+
+.proposal-card {
+  height: 100%;
+  min-height: 0;
+}
+
+.proposal-card__visual {
+  height: 100%;
+  min-height: 0;
+}
+
+/* Portable étroit : on garde carte + actions en haut,
+   puis les propositions sur toute la largeur. */
+@media (max-width: 1180px) {
+  .game-layout {
+    grid-template-areas:
+      "dashboard map"
+      "dashboard proposals"
+      "actions actions";
+    grid-template-columns:
+      clamp(190px, 22vw, 230px)
+      minmax(0, 1fr);
+    grid-template-rows:
+      minmax(440px, 58svh)
+      clamp(250px, 33vh, 320px)
+      auto;
+    height: auto;
+  }
+
+  .actions-panel {
+    max-height: none;
+  }
+
+  .actions-panel__body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .actions-panel > footer {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .finish-copy {
+    flex: 1;
+    margin: 0;
+  }
+
+  .end-turn-button {
+    width: auto;
+    min-width: 220px;
+  }
+}
+
+/* Tablette et mobile : tous les blocs sont empilés. */
+@media (max-width: 760px) {
+  .game-layout {
+    display: flex;
+    height: auto;
+    flex-direction: column;
+  }
+
+  .map-panel {
+    min-height: 62svh;
+    order: 1;
+  }
+
+  .proposal-deck {
+    height: auto;
+    order: 2;
+    overflow: visible;
+  }
+
+  .proposal-grid {
+    height: auto;
+  }
+
+  .dashboard-panel {
+    order: 3;
+  }
+
+  .actions-panel {
+    order: 4;
+  }
+
+  .actions-panel__body {
+    display: block;
+  }
+}
