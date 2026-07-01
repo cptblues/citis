@@ -435,7 +435,7 @@ p {
   background: #dfe8dd;
 }
 
-.game-stage > :first-child {
+.game-stage > .game-viewport {
   width: 100%;
   height: 100%;
 }
@@ -706,6 +706,15 @@ p {
   opacity: 0.38;
 }
 
+.secondary-action:focus-visible,
+.upgrade-action:focus-visible,
+.end-turn-button:focus-visible,
+.restart-button:focus-visible,
+.proposal-card:focus-visible {
+  outline: 3px solid #347ec0;
+  outline-offset: 3px;
+}
+
 .proposal-deck {
   grid-area: proposals;
   display: flex;
@@ -745,7 +754,7 @@ p {
   position: relative;
   display: grid;
   grid-template-columns: clamp(86px, 34%, 112px) minmax(0, 1fr);
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   container-type: inline-size;
   min-height: 0;
   height: 100%;
@@ -833,7 +842,7 @@ p {
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  padding: 15px 14px 5px;
+  padding: 15px 14px 9px;
 }
 
 .proposal-card__type {
@@ -863,43 +872,55 @@ p {
 
 .proposal-card__effects {
   display: flex;
+  align-self: end;
   flex-direction: column;
-  gap: 6px;
-  padding: 4px 14px 9px;
+  gap: 8px;
+  padding: 7px 14px 14px;
 }
 
 .proposal-card__effects > span:first-child {
   color: var(--ink-500);
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .proposal-card__resources {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
 }
 
 .proposal-resource {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 25px minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px;
-  min-width: 108px;
-  padding: 5px 7px;
-  border-radius: 8px;
+  min-width: 0;
+  padding: 8px 9px;
+  border-radius: 10px;
   background: #f3f5f0;
+}
+
+.proposal-resource > span:first-child {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 72%);
+  font-size: 0.9rem;
 }
 
 .proposal-resource small {
   color: var(--ink-500);
-  font-size: 0.58rem;
+  font-size: 0.64rem;
+  font-weight: 750;
 }
 
 .proposal-resource strong {
-  font-size: 0.72rem;
+  font-size: 0.92rem;
 }
 
 .proposal-resource--food > span,
@@ -920,18 +941,6 @@ p {
 .proposal-resource--happiness > span,
 .proposal-resource--happiness strong {
   color: #785499;
-}
-
-.proposal-card__cta {
-  align-self: end;
-  margin: 0 12px 12px;
-  padding: 9px 11px;
-  border-radius: 10px;
-  color: #fff;
-  background: #315f3e;
-  font-size: 0.72rem;
-  font-weight: 900;
-  text-align: center;
 }
 
 .proposal-card--prairie .proposal-card__visual {
@@ -985,10 +994,6 @@ p {
 
 .proposal-card--selected .proposal-card__body {
   padding-top: 30px;
-}
-
-.proposal-card--selected .proposal-card__cta {
-  background: linear-gradient(135deg, #347fc3, #2768a7);
 }
 
 .game-result-backdrop {
@@ -1326,10 +1331,12 @@ p {
 .placement-preview-banner {
   position: absolute;
   z-index: 8;
-  left: 30%;
+  left: 50%;
   bottom: 18px;
   display: flex;
   width: min(520px, calc(100% - 150px));
+  height: auto;
+  min-height: 0;
   align-items: center;
   gap: 10px;
   padding: 10px 13px;
@@ -1341,8 +1348,6 @@ p {
   backdrop-filter: blur(9px);
   pointer-events: none;
   transform: translateX(-50%);
-  height: auto;
-  min-height: 0;
 }
 
 .placement-preview-banner--invalid {
@@ -1369,6 +1374,7 @@ p {
 
 .placement-preview-banner__content {
   min-width: 0;
+  flex: 1;
 }
 
 .placement-preview-banner__content small,
@@ -1386,92 +1392,17 @@ p {
 
 .placement-preview-banner__content strong {
   margin-top: 2px;
-  overflow: hidden;
   font-size: 0.8rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 /* ==========================================================================
-   Proposition entièrement cliquable, effets plus visibles
+   Retour d'interaction des propositions
    ========================================================================== */
-
-.proposal-card {
-  grid-template-rows: minmax(0, 1fr) auto;
-}
-
-.proposal-card__body {
-  padding-bottom: 9px;
-}
-
-.proposal-card__effects {
-  align-self: end;
-  gap: 8px;
-  padding: 7px 14px 14px;
-}
-
-.proposal-card__effects > span:first-child {
-  font-size: 0.65rem;
-}
-
-.proposal-card__resources {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
-}
-
-.proposal-resource {
-  grid-template-columns: 25px minmax(0, 1fr) auto;
-  min-width: 0;
-  padding: 8px 9px;
-  border-radius: 10px;
-}
-
-.proposal-resource > span:first-child {
-  display: grid;
-  width: 25px;
-  height: 25px;
-  place-items: center;
-  border-radius: 8px;
-  background: rgb(255 255 255 / 72%);
-  font-size: 0.9rem;
-}
-
-.proposal-resource small {
-  font-size: 0.64rem;
-  font-weight: 750;
-}
-
-.proposal-resource strong {
-  font-size: 0.92rem;
-}
-
-/* Le CTA interne n'existe plus. Cette règle protège également contre un
-   ancien cache CSS/JS pendant le développement. */
-.proposal-card__cta {
-  display: none;
-}
-
-.proposal-card::after {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
-  content: "Cliquer pour sélectionner";
-  color: var(--ink-500);
-  font-size: 0.59rem;
-  font-weight: 750;
-  opacity: 0;
-  transition: opacity 150ms ease;
-}
 
 .proposal-card:hover:not(:disabled)::after {
   opacity: 0.72;
-}
-
-.proposal-card--selected::after {
-  content: "Sélection active";
-  color: #2f73ae;
-  opacity: 1;
 }
 
 @container (max-width: 300px) {
@@ -1498,6 +1429,7 @@ p {
 
 @media (max-width: 760px) {
   .placement-preview-banner {
+    left: 50%;
     bottom: 68px;
     width: calc(100% - 24px);
   }
