@@ -1,12 +1,15 @@
-import type {
-  BoardState,
-  PlacedTerritoryTile,
-  TerritoryTileTypeId,
+import {
+  getBoardEdgeFeaturesBetween,
+  type BoardEdgeFeatureKind,
+  type BoardState,
+  type PlacedTerritoryTile,
+  type TerritoryTileTypeId,
 } from "./board";
 import { getHexDistance } from "./hex";
 import type { TerritoryResources } from "./resources";
 
-export interface TerritoryAdjacencySynergyDefinition {
+export interface TerritoryTileAdjacencySynergyDefinition {
+  kind?: "tile-adjacency";
   id: string;
   label: string;
   firstTileTypeId: TerritoryTileTypeId;
@@ -14,18 +17,42 @@ export interface TerritoryAdjacencySynergyDefinition {
   resourceBonus: TerritoryResources;
 }
 
+export interface TerritoryEdgeFeatureSynergyDefinition {
+  kind: "edge-feature";
+  id: string;
+  label: string;
+  tileTypeId: TerritoryTileTypeId;
+  edgeFeatureKind: BoardEdgeFeatureKind;
+  resourceBonus: TerritoryResources;
+}
+
+/**
+ * Le nom historique est conservé pour ne pas propager un renommage dans tout
+ * le prototype. Il représente maintenant aussi les synergies territoriales
+ * portées par une arête de la carte.
+ */
+export type TerritoryAdjacencySynergyDefinition =
+  | TerritoryTileAdjacencySynergyDefinition
+  | TerritoryEdgeFeatureSynergyDefinition;
+
 export interface ActiveTerritorySynergy {
   id: string;
   definitionId: string;
   label: string;
-  tileIds: readonly [string, string];
+  tileIds: readonly string[];
   resourceBonus: TerritoryResources;
+}
+
+function isEdgeFeatureDefinition(
+  definition: TerritoryAdjacencySynergyDefinition,
+): definition is TerritoryEdgeFeatureSynergyDefinition {
+  return definition.kind === "edge-feature";
 }
 
 function tilePairMatchesDefinition(
   firstTile: PlacedTerritoryTile,
   secondTile: PlacedTerritoryTile,
-  definition: TerritoryAdjacencySynergyDefinition,
+  definition: TerritoryTileAdjacencySynergyDefinition,
 ): boolean {
   return (
     (firstTile.typeId === definition.firstTileTypeId &&
@@ -35,11 +62,66 @@ function tilePairMatchesDefinition(
   );
 }
 
+function tileTouchesEdgeFeature(
+  tile: PlacedTerritoryTile,
+  edgeFeatureKind: BoardEdgeFeatureKind,
+): boolean {
+  return Object.values(tile.edgeFeatures ?? {}).some(
+    (features) =>
+      features?.some((feature) => feature.kind === edgeFeatureKind) ?? false,
+  );
+}
+
+/**
+ * Une rivière coupe les relations de voisinage classiques entre les deux rives.
+ * Un pont porté par cette même arête rétablit ces relations.
+ */
+function riverBlocksTileAdjacency(
+  firstTile: PlacedTerritoryTile,
+  secondTile: PlacedTerritoryTile,
+): boolean {
+  const riverFeatures = getBoardEdgeFeaturesBetween(
+    firstTile,
+    secondTile,
+  ).filter((feature) => feature.kind === "river");
+
+  if (riverFeatures.length === 0) {
+    return false;
+  }
+
+  return !riverFeatures.some((feature) => feature.bridge === true);
+}
+
 export function calculateTerritorySynergies(
   state: BoardState,
   definitions: readonly TerritoryAdjacencySynergyDefinition[],
 ): ActiveTerritorySynergy[] {
   const activeSynergies: ActiveTerritorySynergy[] = [];
+  const edgeDefinitions = definitions.filter(isEdgeFeatureDefinition);
+  const adjacencyDefinitions = definitions.filter(
+    (definition): definition is TerritoryTileAdjacencySynergyDefinition =>
+      !isEdgeFeatureDefinition(definition),
+  );
+
+  for (const tile of state.placedTiles) {
+    for (const definition of edgeDefinitions) {
+      if (tile.typeId !== definition.tileTypeId) {
+        continue;
+      }
+
+      if (!tileTouchesEdgeFeature(tile, definition.edgeFeatureKind)) {
+        continue;
+      }
+
+      activeSynergies.push({
+        id: `synergy:${definition.id}:${tile.id}|edge:${definition.edgeFeatureKind}`,
+        definitionId: definition.id,
+        label: definition.label,
+        tileIds: [tile.id],
+        resourceBonus: definition.resourceBonus,
+      });
+    }
+  }
 
   for (
     let firstIndex = 0;
@@ -67,14 +149,17 @@ export function calculateTerritorySynergies(
         continue;
       }
 
-      for (const definition of definitions) {
+      if (riverBlocksTileAdjacency(firstTile, secondTile)) {
+        continue;
+      }
+
+      for (const definition of adjacencyDefinitions) {
         if (!tilePairMatchesDefinition(firstTile, secondTile, definition)) {
           continue;
         }
 
         const firstId =
           firstTile.id < secondTile.id ? firstTile.id : secondTile.id;
-
         const secondId =
           firstTile.id < secondTile.id ? secondTile.id : firstTile.id;
 

@@ -104,9 +104,10 @@ describe("placeTerritoryTile", () => {
       getCell("cell:1:0").id,
       "prairie",
     );
+    const placedPrairie = getPlacedTileAt(nextState, { q: 1, r: 0 });
 
     expect(nextState.placedTiles).toHaveLength(2);
-    expect(nextState.placedTiles).toContainEqual({
+    expect(placedPrairie).toMatchObject({
       id: "territory:prairie:1:0",
       typeId: "prairie",
       q: 1,
@@ -114,6 +115,20 @@ describe("placeTerritoryTile", () => {
       rotation: 0,
       upgradeIds: [],
     });
+  });
+
+  it("conserve les caractéristiques d'arêtes de la case sur la tuile posée", () => {
+    const initialState = createInitialBoardState();
+    const targetCell = getCell("cell:1:0");
+    const nextState = placeTerritoryTile(
+      prototypeBoardCells,
+      initialState,
+      targetCell.id,
+      "forest",
+    );
+    const placedForest = getPlacedTileAt(nextState, targetCell);
+
+    expect(placedForest?.edgeFeatures).toBe(targetCell.edgeFeatures);
   });
 
   it("refuse une tuile éloignée du territoire", () => {

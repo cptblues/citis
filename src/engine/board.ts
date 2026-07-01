@@ -29,13 +29,16 @@ export interface BoardEdgeFeature {
   blocksExpansion?: boolean;
 }
 
-export interface BoardCell extends HexCoordinate {
-  id: string;
-  blocked?: boolean;
+export interface BoardEdgeFeatureCarrier extends HexCoordinate {
   edgeFeatures?: Partial<Record<HexSide, readonly BoardEdgeFeature[]>>;
 }
 
-export interface PlacedTerritoryTile extends HexCoordinate {
+export interface BoardCell extends BoardEdgeFeatureCarrier {
+  id: string;
+  blocked?: boolean;
+}
+
+export interface PlacedTerritoryTile extends BoardEdgeFeatureCarrier {
   id: string;
   typeId: TerritoryTileTypeId;
   rotation: HexRotation;
@@ -84,6 +87,32 @@ export function getPlacedTileAt(
   return state.placedTiles.find(
     (tile) => tile.q === coordinate.q && tile.r === coordinate.r,
   );
+}
+
+/**
+ * Retourne les éléments présents sur l'arête partagée par deux hexagones voisins.
+ *
+ * Les scénarios enregistrent volontairement l'information sur les deux cases.
+ * Le Set évite donc de compter deux fois le même objet de configuration.
+ */
+export function getBoardEdgeFeaturesBetween(
+  first: BoardEdgeFeatureCarrier,
+  second: BoardEdgeFeatureCarrier,
+): readonly BoardEdgeFeature[] {
+  const firstSide = getHexSideBetween(first, second);
+
+  if (firstSide === null) {
+    return [];
+  }
+
+  const secondSide = getOppositeHexSide(firstSide);
+
+  return [
+    ...new Set([
+      ...(first.edgeFeatures?.[firstSide] ?? []),
+      ...(second.edgeFeatures?.[secondSide] ?? []),
+    ]),
+  ];
 }
 
 /**
@@ -156,6 +185,7 @@ export function placeTerritoryTile(
     r: cell.r,
     rotation,
     upgradeIds: [],
+    edgeFeatures: cell.edgeFeatures,
   };
 
   return {
@@ -177,19 +207,7 @@ function edgeBlocksTerritoryExpansion(
     return false;
   }
 
-  const originSide = getHexSideBetween(originCell, destination);
-
-  if (originSide === null) {
-    return false;
-  }
-
-  const destinationSide = getOppositeHexSide(originSide);
-  const features = [
-    ...(originCell.edgeFeatures?.[originSide] ?? []),
-    ...(destination.edgeFeatures?.[destinationSide] ?? []),
-  ];
-
-  return features.some(
+  return getBoardEdgeFeaturesBetween(originCell, destination).some(
     (feature) => feature.blocksExpansion === true && feature.bridge !== true,
   );
 }

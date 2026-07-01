@@ -52,6 +52,7 @@ describe("territory content catalog", () => {
   it("déplie les synergies par tags en règles moteur", () => {
     expect(TERRITORY_SYNERGY_DEFINITIONS).toContainEqual({
       id: "connected-forests",
+      kind: "tile-adjacency",
       label: "Forêts connectées",
       firstTileTypeId: "forest",
       secondTileTypeId: "forest",
@@ -65,9 +66,10 @@ describe("territory content catalog", () => {
 
     expect(TERRITORY_SYNERGY_DEFINITIONS).toContainEqual({
       id: "protected-water",
+      kind: "edge-feature",
       label: "Eau protégée",
-      firstTileTypeId: "forest",
-      secondTileTypeId: "river",
+      tileTypeId: "forest",
+      edgeFeatureKind: "river",
       resourceBonus: {
         food: 0,
         energy: 0,
@@ -77,7 +79,22 @@ describe("territory content catalog", () => {
     });
 
     expect(TERRITORY_SYNERGY_DEFINITIONS).toContainEqual({
+      id: "field-irrigation",
+      kind: "edge-feature",
+      label: "Irrigation",
+      tileTypeId: "field",
+      edgeFeatureKind: "river",
+      resourceBonus: {
+        food: 2,
+        energy: 0,
+        nature: 0,
+        happiness: 0,
+      },
+    });
+
+    expect(TERRITORY_SYNERGY_DEFINITIONS).toContainEqual({
       id: "orchard-pollination",
+      kind: "tile-adjacency",
       label: "Pollinisation",
       firstTileTypeId: "orchard",
       secondTileTypeId: "prairie",
@@ -91,6 +108,7 @@ describe("territory content catalog", () => {
 
     expect(TERRITORY_SYNERGY_DEFINITIONS).toContainEqual({
       id: "farm-short-circuit",
+      kind: "tile-adjacency",
       label: "Circuit court",
       firstTileTypeId: "farm",
       secondTileTypeId: "town",
