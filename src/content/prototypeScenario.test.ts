@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { PROTOTYPE_SCENARIO } from "./prototypeScenario";
 
 describe("PROTOTYPE_SCENARIO", () => {
@@ -27,5 +26,28 @@ describe("PROTOTYPE_SCENARIO", () => {
     expect(targets.energy).toBeGreaterThan(0);
     expect(targets.nature).toBeGreaterThan(0);
     expect(targets.happiness).toBeGreaterThan(0);
+  });
+
+  it("décrit un plateau irrégulier avec un bourg central", () => {
+    expect(PROTOTYPE_SCENARIO.board.rows).toHaveLength(11);
+    expect(PROTOTYPE_SCENARIO.board.initialTiles).toContainEqual({
+      typeId: "town",
+      q: 0,
+      r: 0,
+      rotation: 0,
+    });
+  });
+
+  it("exclut la rivière des propositions de ce scénario", () => {
+    expect(PROTOTYPE_SCENARIO.board.proposalTileTypeIds).not.toContain("river");
+  });
+
+  it("définit trois ponts sur le fleuve", () => {
+    const bridges = PROTOTYPE_SCENARIO.board.edges.filter(
+      (edge) =>
+        edge.kind === "river" && "bridge" in edge && edge.bridge === true,
+    );
+
+    expect(bridges).toHaveLength(3);
   });
 });

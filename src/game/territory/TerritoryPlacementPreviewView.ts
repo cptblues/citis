@@ -1,5 +1,4 @@
 import Phaser from "phaser";
-
 import { getTerritoryTileDefinition } from "../../content/territoryTileDefinitions";
 import type { HexRotation } from "../../engine/hex";
 import type { SelectedTileTypeId } from "../gameEvents";
@@ -73,7 +72,10 @@ export class TerritoryPlacementPreviewView {
       options.cellView.centerY,
     );
 
-    ghost.setAlpha(options.valid ? 0.65 : 0.25).setDepth(15);
+    ghost
+      .setScale(options.cellView.contentScale)
+      .setAlpha(options.valid ? 0.65 : 0.25)
+      .setDepth(15);
     this.placementGhostView = ghost;
   }
 

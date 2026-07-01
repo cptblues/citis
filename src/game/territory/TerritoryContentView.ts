@@ -1,5 +1,4 @@
 import Phaser from "phaser";
-
 import type { PrototypeUpgradeTypeId } from "../../content/territoryUpgradeDefinitions";
 import type { PlacedTerritoryTile } from "../../engine/board";
 import { createTerritoryTileContent } from "../rendering/territoryTileContent";
@@ -34,7 +33,7 @@ export class TerritoryContentView {
       tile,
       cellView.centerX,
       cellView.centerY,
-    );
+    ).setScale(cellView.contentScale);
 
     this.placedTileContentViews.set(tile.id, container);
   }
@@ -55,7 +54,7 @@ export class TerritoryContentView {
       upgradeTypeId,
       cellView.centerX,
       cellView.centerY,
-    );
+    ).setScale(cellView.contentScale);
 
     this.placedUpgradeViews.set(viewKey, upgradeView);
   }

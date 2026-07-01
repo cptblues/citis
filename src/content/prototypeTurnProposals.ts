@@ -1,20 +1,20 @@
+import { PROTOTYPE_SCENARIO } from "./prototypeScenario";
 import { TERRITORY_CONTENT } from "./territoryContentCatalog";
-import {
-  PROTOTYPE_PLACEABLE_TILE_TYPE_IDS,
-  type PrototypePlaceableTileTypeId,
-} from "./territoryTileDefinitions";
+import type { PrototypePlaceableTileTypeId } from "./territoryTileDefinitions";
 
 /**
- * Produit une fenêtre tournante dans le catalogue des tuiles proposées.
- * L'ajout d'une nouvelle tuile activée dans le catalogue ne demande aucune
- * modification de cette fonction.
+ * Produit une fenêtre tournante dans le catalogue autorisé par le scénario.
+ *
+ * La rivière est désormais une infrastructure fixe du plateau et n'apparaît
+ * donc plus parmi les propositions de cette commune.
  */
 export function getPrototypeTurnProposals(
   turnNumber: number,
 ): readonly PrototypePlaceableTileTypeId[] {
-  const availableTileTypeIds = PROTOTYPE_PLACEABLE_TILE_TYPE_IDS.filter(
-    (tileTypeId) => TERRITORY_CONTENT.tiles[tileTypeId].proposals.enabled,
-  );
+  const availableTileTypeIds =
+    PROTOTYPE_SCENARIO.board.proposalTileTypeIds.filter(
+      (tileTypeId) => TERRITORY_CONTENT.tiles[tileTypeId].proposals.enabled,
+    );
 
   if (availableTileTypeIds.length === 0) {
     return [];

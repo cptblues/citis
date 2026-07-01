@@ -1,12 +1,19 @@
-import { getHexDistance, type HexCoordinate, type HexRotation } from "./hex";
-import {
-  canPlaceTerritoryTileConnections,
-  type TerritoryConnectionDefinitions,
-} from "./connections";
 import type {
   PlaceableTerritoryTileTypeId,
   TerritoryTileTypeId,
 } from "../content/territoryContentCatalog";
+import {
+  canPlaceTerritoryTileConnections,
+  type TerritoryConnectionDefinitions,
+} from "./connections";
+import {
+  getHexDistance,
+  getHexSideBetween,
+  getOppositeHexSide,
+  type HexCoordinate,
+  type HexRotation,
+  type HexSide,
+} from "./hex";
 
 export { TERRITORY_TILE_TYPE_IDS } from "../content/territoryContentCatalog";
 export type {
@@ -14,8 +21,18 @@ export type {
   TerritoryTileTypeId,
 } from "../content/territoryContentCatalog";
 
+export type BoardEdgeFeatureKind = "river" | "major-road";
+
+export interface BoardEdgeFeature {
+  kind: BoardEdgeFeatureKind;
+  bridge?: boolean;
+  blocksExpansion?: boolean;
+}
+
 export interface BoardCell extends HexCoordinate {
   id: string;
+  blocked?: boolean;
+  edgeFeatures?: Partial<Record<HexSide, readonly BoardEdgeFeature[]>>;
 }
 
 export interface PlacedTerritoryTile extends HexCoordinate {
@@ -70,22 +87,27 @@ export function getPlacedTileAt(
 }
 
 /**
- * Liste les cases libres adjacentes à au moins une tuile déjà posée.
+ * Liste les cases libres atteignables depuis au moins une tuile déjà posée.
+ *
+ * Une rivière définie sur l'arête partagée bloque la propagation du territoire,
+ * sauf lorsqu'un pont est explicitement présent sur cette traversée.
  */
 export function getAvailablePlacementCells(
   cells: readonly BoardCell[],
   state: BoardState,
 ): BoardCell[] {
   return cells.filter((cell) => {
-    const isOccupied = getPlacedTileAt(state, cell) !== undefined;
-
-    if (isOccupied) {
+    if (cell.blocked === true || getPlacedTileAt(state, cell) !== undefined) {
       return false;
     }
 
-    return state.placedTiles.some(
-      (placedTile) => getHexDistance(cell, placedTile) === 1,
-    );
+    return state.placedTiles.some((placedTile) => {
+      if (getHexDistance(cell, placedTile) !== 1) {
+        return false;
+      }
+
+      return !edgeBlocksTerritoryExpansion(cells, placedTile, cell);
+    });
   });
 }
 
@@ -140,4 +162,34 @@ export function placeTerritoryTile(
     ...state,
     placedTiles: [...state.placedTiles, placedTile],
   };
+}
+
+function edgeBlocksTerritoryExpansion(
+  cells: readonly BoardCell[],
+  origin: HexCoordinate,
+  destination: BoardCell,
+): boolean {
+  const originCell = cells.find(
+    (cell) => cell.q === origin.q && cell.r === origin.r,
+  );
+
+  if (originCell === undefined) {
+    return false;
+  }
+
+  const originSide = getHexSideBetween(originCell, destination);
+
+  if (originSide === null) {
+    return false;
+  }
+
+  const destinationSide = getOppositeHexSide(originSide);
+  const features = [
+    ...(originCell.edgeFeatures?.[originSide] ?? []),
+    ...(destination.edgeFeatures?.[destinationSide] ?? []),
+  ];
+
+  return features.some(
+    (feature) => feature.blocksExpansion === true && feature.bridge !== true,
+  );
 }
