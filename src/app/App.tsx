@@ -9,6 +9,13 @@ import {
 } from "../content/territoryUpgradeDefinitions";
 import { getNextHexRotation, type HexRotation } from "../engine/hex";
 import {
+  canSpendImprovementPoints,
+  createInitialImprovementPoints,
+  getNextImprovementPointGrantTurn,
+  grantImprovementPointsForTurn,
+  spendImprovementPoints,
+} from "../engine/improvementPoints";
+import {
   createEmptyTerritoryResources,
   type TerritoryResources,
 } from "../engine/resources";
@@ -25,8 +32,8 @@ import { GameViewport } from "../game/GameViewport";
 import type {
   SelectedTileTypeId,
   SelectedUpgradeTypeId,
-  TerritorySummaryChangedPayload,
   TerritoryPlacementPreviewChangedPayload,
+  TerritorySummaryChangedPayload,
 } from "../game/gameEvents";
 import "./App.css";
 
@@ -129,6 +136,10 @@ function formatScore(score: number): string {
   return score.toLocaleString("fr-FR");
 }
 
+function formatPointCost(cost: number): string {
+  return `${cost} pt${cost > 1 ? "s" : ""}`;
+}
+
 function createEmptyTerritorySummary(): TerritorySummaryChangedPayload {
   return {
     resources: createEmptyTerritoryResources(),
@@ -178,6 +189,9 @@ export function App() {
     useState<TerritorySummaryChangedPayload>(createEmptyTerritorySummary);
   const [placementPreview, setPlacementPreview] =
     useState<TerritoryPlacementPreviewChangedPayload>(null);
+  const [improvementPoints, setImprovementPoints] = useState(() =>
+    createInitialImprovementPoints(PROTOTYPE_SCENARIO.improvements),
+  );
 
   const proposals = getPrototypeTurnProposals(turnState.number);
   const selectedTileDefinition =
@@ -201,7 +215,14 @@ export function App() {
       (scoreBreakdown.totalScore / PROTOTYPE_SCENARIO.targetScore) * 100,
     ),
   );
-
+  const nextImprovementPointTurn = getNextImprovementPointGrantTurn(
+    turnState.number,
+    PROTOTYPE_SCENARIO.improvements,
+  );
+  const nextImprovementPointLabel =
+    nextImprovementPointTurn === null
+      ? "Aucun nouveau point prévu"
+      : `+${PROTOTYPE_SCENARIO.improvements.pointsPerGrant} au tour ${nextImprovementPointTurn}`;
   const phase = !turnState.placementCompleted
     ? {
         index: 1,
@@ -214,7 +235,9 @@ export function App() {
           index: 2,
           title: "Amélioration facultative",
           description:
-            "Choisis une amélioration compatible ou termine directement le tour.",
+            improvementPoints > 0
+              ? "Dépense des points maintenant ou conserve-les pour un prochain tour."
+              : "Tu n'as plus de point disponible : termine le tour pour continuer.",
         }
       : {
           index: 3,
@@ -241,7 +264,15 @@ export function App() {
       return;
     }
 
-    setTurnState((currentState) => endTurn(currentState));
+    const nextTurnState = endTurn(turnState);
+    setTurnState(nextTurnState);
+    setImprovementPoints((currentPoints) =>
+      grantImprovementPointsForTurn(
+        currentPoints,
+        nextTurnState.number,
+        PROTOTYPE_SCENARIO.improvements,
+      ),
+    );
     clearSelections();
   }
 
@@ -250,6 +281,9 @@ export function App() {
     setGameCompleted(false);
     setTurnState(createInitialTurnState());
     setTerritorySummary(createEmptyTerritorySummary());
+    setImprovementPoints(
+      createInitialImprovementPoints(PROTOTYPE_SCENARIO.improvements),
+    );
     clearSelections();
   }
 
@@ -301,6 +335,13 @@ export function App() {
               <small> / {formatScore(PROTOTYPE_SCENARIO.targetScore)}</small>
             </strong>
           </div>
+          <div className="header-improvement-points">
+            <span>Aménagement</span>
+            <strong>
+              {improvementPoints}
+              <small> pt{improvementPoints === 1 ? "" : "s"}</small>
+            </strong>
+          </div>
         </div>
       </header>
 
@@ -317,7 +358,6 @@ export function App() {
               <h3>Ressources</h3>
               <span>{territorySummary.placedTileCount} tuiles</span>
             </div>
-
             <dl className="dashboard-resources">
               {RESOURCE_PRESENTATION.map((resource) => (
                 <div
@@ -332,6 +372,16 @@ export function App() {
                 </div>
               ))}
             </dl>
+          </section>
+
+          <section className="dashboard-section improvement-budget-card">
+            <div className="section-heading">
+              <h3>Aménagement</h3>
+              <span>{improvementPoints} disponibles</span>
+            </div>
+            <strong>{improvementPoints}</strong>
+            <small>points conservés d'un tour à l'autre</small>
+            <p>{nextImprovementPointLabel}</p>
           </section>
 
           <section className="dashboard-section dashboard-score">
@@ -387,9 +437,9 @@ export function App() {
                 <small>{phase.description}</small>
               </div>
             </div>
-
             <div className="map-badges">
               <span>{territorySummary.placedTileCount} tuiles</span>
+              <span>{improvementPoints} pts d'aménagement</span>
               <span className={finalTurn ? "map-badge--final" : undefined}>
                 {finalTurn ? "Dernier tour" : `Tour ${turnState.number}`}
               </span>
@@ -415,7 +465,13 @@ export function App() {
                 turnState.placementCompleted &&
                 !turnState.improvementCompleted
               }
-              onUpgradeApplied={() => {
+              onUpgradeApplied={(payload) => {
+                const definition = getTerritoryUpgradeDefinition(
+                  payload.upgradeTypeId,
+                );
+                setImprovementPoints((currentPoints) =>
+                  spendImprovementPoints(currentPoints, definition.cost),
+                );
                 setTurnState((currentState) =>
                   markImprovementCompleted(currentState),
                 );
@@ -426,6 +482,7 @@ export function App() {
               onTerritorySummaryChanged={setTerritorySummary}
               onPlacementPreviewChanged={setPlacementPreview}
             />
+
             {placementPreview !== null ? (
               <aside
                 className={`placement-preview-banner${
@@ -441,7 +498,6 @@ export function App() {
                 >
                   {placementPreview.valid ? "✦" : "!"}
                 </span>
-
                 <span className="placement-preview-banner__content">
                   <small>
                     {placementPreview.synergyLabels.length > 0
@@ -450,7 +506,6 @@ export function App() {
                         ? "Aperçu du placement"
                         : "Placement impossible"}
                   </small>
-
                   <strong>
                     {placementPreview.synergyLabels.length > 0
                       ? placementPreview.synergyLabels.join(" · ")
@@ -534,7 +589,12 @@ export function App() {
                 <span>2</span>
                 <div>
                   <strong>Amélioration facultative</strong>
-                  <small>Disponible après le placement.</small>
+                  <small>
+                    {improvementPoints} point
+                    {improvementPoints === 1 ? "" : "s"} disponible
+                    {improvementPoints === 1 ? "" : "s"} ·{" "}
+                    {nextImprovementPointLabel}
+                  </small>
                 </div>
               </div>
 
@@ -544,6 +604,10 @@ export function App() {
                     getTerritoryUpgradeDefinition(upgradeTypeId);
                   const isSelected = selectedUpgradeTypeId === upgradeTypeId;
                   const tone = getPrimaryResourceTone(definition.resourceBonus);
+                  const affordable = canSpendImprovementPoints(
+                    improvementPoints,
+                    definition.cost,
+                  );
 
                   return (
                     <button
@@ -553,10 +617,14 @@ export function App() {
                         isSelected ? " upgrade-action--selected" : ""
                       }`}
                       aria-pressed={isSelected}
+                      aria-label={`${definition.label}, coût ${formatPointCost(
+                        definition.cost,
+                      )}`}
                       disabled={
                         interactionsDisabled ||
                         !turnState.placementCompleted ||
-                        turnState.improvementCompleted
+                        turnState.improvementCompleted ||
+                        !affordable
                       }
                       onClick={() => {
                         setSelectedUpgradeTypeId(
@@ -575,12 +643,20 @@ export function App() {
                               ? "☀"
                               : "⌁"}
                       </span>
-                      <span>
-                        <strong>{definition.label}</strong>
+                      <span className="upgrade-action__copy">
+                        <span className="upgrade-action__title-row">
+                          <strong>{definition.label}</strong>
+                          <em>{formatPointCost(definition.cost)}</em>
+                        </span>
                         <small>
                           {definition.targetLabel} ·{" "}
                           {formatResourceSummary(definition.resourceBonus)}
                         </small>
+                        {!affordable ? (
+                          <small className="upgrade-action__unavailable">
+                            Points insuffisants
+                          </small>
+                        ) : null}
                       </span>
                     </button>
                   );
@@ -594,7 +670,7 @@ export function App() {
               <span>3</span>
               <p>
                 {turnState.placementCompleted
-                  ? "Le tour peut être validé."
+                  ? "Le tour peut être validé. Les points non dépensés sont conservés."
                   : "Place d'abord une proposition."}
               </p>
             </div>
@@ -639,7 +715,7 @@ export function App() {
 
               return (
                 <button
-                  key={`${turnState.number}:${proposalIndex}:${tileTypeId}`}
+                  key={`${turnState.number}-${tileTypeId}`}
                   type="button"
                   className={`proposal-card proposal-card--${tileTypeId}${
                     isSelected ? " proposal-card--selected" : ""
@@ -662,11 +738,9 @@ export function App() {
                       ✓ Sélectionnée
                     </span>
                   ) : null}
-
                   <span className="proposal-card__visual" aria-hidden="true">
                     <span>{presentation.icon}</span>
                   </span>
-
                   <span className="proposal-card__body">
                     <span className="proposal-card__type">
                       {presentation.subtitle}
@@ -674,7 +748,6 @@ export function App() {
                     <strong>{definition.label}</strong>
                     <small>{presentation.description}</small>
                   </span>
-
                   <span className="proposal-card__effects">
                     <span>Effets immédiats</span>
                     <span className="proposal-card__resources">
@@ -708,25 +781,21 @@ export function App() {
             aria-modal="true"
             aria-labelledby="result-title"
           >
-            <p className="eyebrow">Bilan de la commune</p>
+            <p className="panel-kicker">Bilan de la commune</p>
             <h2 id="result-title">{PROTOTYPE_SCENARIO.label}</h2>
             <p
-              className={
-                scenarioSucceeded
-                  ? "game-result__status game-result__status--success"
-                  : "game-result__status"
-              }
+              className={`game-result__status${
+                scenarioSucceeded ? " game-result__status--success" : ""
+              }`}
             >
               {scenarioSucceeded ? "Commune réussie" : "Commune encore fragile"}
             </p>
-
-            <div className="game-result__score">
+            <p className="game-result__score">
               <strong>{formatScore(scoreBreakdown.totalScore)}</strong>
               <span>
                 Objectif : {formatScore(PROTOTYPE_SCENARIO.targetScore)} points
               </span>
-            </div>
-
+            </p>
             <dl className="resource-results">
               {RESOURCE_PRESENTATION.map((resource) => (
                 <div key={resource.key}>
@@ -735,7 +804,6 @@ export function App() {
                 </div>
               ))}
             </dl>
-
             <div className="score-breakdown">
               <span>
                 Ressources : {formatScore(scoreBreakdown.resourceScore)}
@@ -744,7 +812,9 @@ export function App() {
                 Équilibre : +{formatScore(scoreBreakdown.balanceBonus)}
               </span>
             </div>
-
+            <p className="game-result__hint">
+              Points d'aménagement restants : {improvementPoints}
+            </p>
             {!scenarioSucceeded ? (
               <p className="game-result__hint">
                 Il manque{" "}
@@ -754,7 +824,6 @@ export function App() {
                 points pour atteindre l'objectif.
               </p>
             ) : null}
-
             <button
               type="button"
               className="restart-button"

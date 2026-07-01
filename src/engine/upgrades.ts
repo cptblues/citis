@@ -5,6 +5,7 @@ export interface TerritoryUpgradeDefinition {
   id: string;
   label: string;
   description: string;
+  cost: number;
   allowedTileTypeIds: readonly TerritoryTileTypeId[];
   resourceBonus: TerritoryResources;
 }
@@ -20,7 +21,6 @@ export function canApplyTerritoryUpgrade(
   definitions: TerritoryUpgradeDefinitions,
 ): boolean {
   const tile = state.placedTiles.find((candidate) => candidate.id === tileId);
-
   const definition = definitions[upgradeId];
 
   if (tile === undefined || definition === undefined) {

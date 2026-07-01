@@ -12,6 +12,13 @@ import { getTerritoryTileTypeIdsWithTags } from "./territoryTileDefinitions";
 
 export type PrototypeUpgradeTypeId = TerritoryUpgradeTypeId;
 
+const PROTOTYPE_UPGRADE_COSTS = {
+  "forest-trail": 1,
+  hedges: 1,
+  beehives: 1,
+  "solar-panels": 2,
+} as const satisfies Readonly<Record<PrototypeUpgradeTypeId, number>>;
+
 export interface PrototypeTerritoryUpgradeDefinition extends TerritoryUpgradeDefinition {
   renderer: TerritoryUpgradeRendererKey;
   targetLabel: string;
@@ -27,11 +34,11 @@ export const PROTOTYPE_UPGRADE_TYPE_IDS = TERRITORY_UPGRADE_TYPE_IDS;
 export const TERRITORY_UPGRADE_DEFINITIONS = Object.fromEntries(
   PROTOTYPE_UPGRADE_TYPE_IDS.map((upgradeTypeId) => {
     const contentDefinition = TERRITORY_CONTENT.upgrades[upgradeTypeId];
-
     const definition: PrototypeTerritoryUpgradeDefinition = {
       id: upgradeTypeId,
       label: contentDefinition.label,
       description: contentDefinition.description,
+      cost: PROTOTYPE_UPGRADE_COSTS[upgradeTypeId],
       allowedTileTypeIds: getTerritoryTileTypeIdsWithTags(
         contentDefinition.target.requiredTags,
       ),

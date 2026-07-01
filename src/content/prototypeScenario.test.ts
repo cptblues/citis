@@ -28,6 +28,14 @@ describe("PROTOTYPE_SCENARIO", () => {
     expect(targets.happiness).toBeGreaterThan(0);
   });
 
+  it("cadence les points d’aménagement sur la partie", () => {
+    expect(PROTOTYPE_SCENARIO.improvements).toEqual({
+      initialPoints: 2,
+      pointsPerGrant: 1,
+      pointsGrantedAtTurns: [4, 7, 10, 13],
+    });
+  });
+
   it("décrit un plateau irrégulier avec un bourg central", () => {
     expect(PROTOTYPE_SCENARIO.board.rows).toHaveLength(11);
     expect(PROTOTYPE_SCENARIO.board.initialTiles).toContainEqual({

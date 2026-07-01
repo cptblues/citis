@@ -1401,8 +1401,26 @@ p {
    Retour d'interaction des propositions
    ========================================================================== */
 
+.proposal-card::after {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  content: "Cliquer pour sélectionner";
+  color: var(--ink-500);
+  font-size: 0.59rem;
+  font-weight: 750;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
 .proposal-card:hover:not(:disabled)::after {
   opacity: 0.72;
+}
+
+.proposal-card--selected::after {
+  content: "Sélection active";
+  color: #2f73ae;
+  opacity: 1;
 }
 
 @container (max-width: 300px) {
@@ -1440,5 +1458,74 @@ p {
 
   .proposal-card::after {
     display: none;
+  }
+}
+
+/* Points d'aménagement */
+.header-improvement-points strong {
+  color: #8a5b1f;
+}
+
+.improvement-budget-card {
+  background: linear-gradient(145deg, #fff9e8, #f6eed9);
+}
+
+.improvement-budget-card > strong {
+  display: block;
+  margin-top: 8px;
+  color: #8a5b1f;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.improvement-budget-card > small {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-500);
+  font-size: 0.66rem;
+}
+
+.improvement-budget-card > p {
+  margin: 10px 0 0;
+  color: #6e522c;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.upgrade-action__copy {
+  min-width: 0;
+}
+
+.upgrade-action__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.upgrade-action__title-row em {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #fff;
+  background: rgb(255 255 255 / 20%);
+  font-size: 0.59rem;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.upgrade-action__unavailable {
+  color: #fff !important;
+  font-weight: 900;
+}
+
+@media (max-width: 1080px) {
+  .header-progress {
+    gap: 11px;
+  }
+
+  .header-progress > div {
+    min-width: 68px;
   }
 }

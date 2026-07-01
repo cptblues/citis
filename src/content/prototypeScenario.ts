@@ -43,6 +43,12 @@ export interface TerritoryScenarioBoardDefinition {
   proposalTileTypeIds: readonly PlaceableTerritoryTileTypeId[];
 }
 
+export interface TerritoryImprovementPointsDefinition {
+  initialPoints: number;
+  pointsPerGrant: number;
+  pointsGrantedAtTurns: readonly number[];
+}
+
 export interface TerritoryScenarioDefinition {
   id: string;
   label: string;
@@ -50,6 +56,7 @@ export interface TerritoryScenarioDefinition {
   maximumTurns: number;
   targetScore: number;
   scoring: TerritoryScoringDefinition;
+  improvements: TerritoryImprovementPointsDefinition;
   board: TerritoryScenarioBoardDefinition;
 }
 
@@ -81,6 +88,11 @@ export const PROTOTYPE_SCENARIO = {
       happiness: 20,
     },
     maximumBalanceBonus: 1000,
+  },
+  improvements: {
+    initialPoints: 2,
+    pointsPerGrant: 1,
+    pointsGrantedAtTurns: [4, 7, 10, 13],
   },
   board: {
     rows: [

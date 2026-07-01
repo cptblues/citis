@@ -26,6 +26,13 @@ const state: BoardState = {
 };
 
 describe("territory upgrades", () => {
+  it("définit les coûts du prototype", () => {
+    expect(TERRITORY_UPGRADE_DEFINITIONS["forest-trail"].cost).toBe(1);
+    expect(TERRITORY_UPGRADE_DEFINITIONS.hedges.cost).toBe(1);
+    expect(TERRITORY_UPGRADE_DEFINITIONS.beehives.cost).toBe(1);
+    expect(TERRITORY_UPGRADE_DEFINITIONS["solar-panels"].cost).toBe(2);
+  });
+
   it("autorise un sentier sur une forêt", () => {
     expect(
       canApplyTerritoryUpgrade(
